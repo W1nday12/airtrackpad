@@ -2,20 +2,18 @@
 sys.path.insert(0, r"D:\Download\project\duolingo")
 import duo_guard as g
 cfg = g.load_config(); tok = cfg["jwt_token"]
-uid = g.jwt_subject(tok)
-tests = [
- ("stories ru->en", "https://stories.duolingo.com/api2/stories?fromLanguage=ru&learningLanguage=en"),
- ("stories no params", "https://stories.duolingo.com/api2/stories"),
- ("v2017 stories", "https://www.duolingo.com/2017-06-30/stories?fromLanguage=ru&learningLanguage=en"),
- ("v2017 stories list", "https://www.duolingo.com/2017-06-30/stories"),
- ("user stories", "https://www.duolingo.com/2017-06-30/users/%s/stories" % uid),
-]
-for name, url in tests:
-    st, data = g.http_json("GET", url, tok)
-    if isinstance(data, dict):
-        shape = "dict keys=" + ",".join(list(data.keys())[:8])
-    elif isinstance(data, list):
-        shape = "list len=%d first_keys=%s" % (len(data), ",".join(list(data[0].keys())[:8]) if data and isinstance(data[0], dict) else "?")
-    else:
-        shape = type(data).__name__
-    print("%-20s HTTP %-4s %s" % (name, st, shape[:160]))
+st, data = g.http_json("GET", "https://stories.duolingo.com/api2/stories?fromLanguage=ru&learningLanguage=en", tok)
+print("HTTP", st, "top keys:", list(data.keys()))
+sets = data.get("sets")
+print("sets type:", type(sets).__name__, "len:", len(sets) if hasattr(sets,'__len__') else '?')
+if isinstance(sets, list) and sets:
+    s0 = sets[0]
+    print("set0 keys:", list(s0.keys()))
+    stories = s0.get("stories")
+    print("set0 stories:", type(stories).__name__, len(stories) if hasattr(stories,'__len__') else '?')
+    if isinstance(stories, list) and stories:
+        print("story0 keys:", list(stories[0].keys()))
+        print("story0:", json.dumps({k: stories[0].get(k) for k in ('slug','title','id','setId')}, ensure_ascii=False)[:300])
+elif isinstance(sets, dict) and sets:
+    k0 = list(sets.keys())[0]
+    print("set key:", k0, "value keys:", list(sets[k0].keys()) if isinstance(sets[k0], dict) else type(sets[k0]).__name__)
