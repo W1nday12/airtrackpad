@@ -20,6 +20,7 @@ $Branch = 'main'
 $PollSeconds = 5
 $DebounceSeconds = 3
 $LogFile = Join-Path $Repo '.git\sync.log'
+$script:LastSkipped = ''
 
 function Write-Log([string]$Message) {
     try {
@@ -87,14 +88,23 @@ while ($true) {
                 }
                 if ($bigPaths.Count -gt 0) {
                     Invoke-Git (@('reset', '-q', '--') + $bigPaths) | Out-Null
-                    Write-Log ("skipped large files (>45 MB): " + ($bigPaths -join ', '))
+                    $bigKey = ($bigPaths -join '|')
+                    if ($bigKey -ne $script:LastSkipped) {
+                        Write-Log ("skipped large files (>45 MB): " + ($bigPaths -join ', '))
+                        $script:LastSkipped = $bigKey
+                    }
+                } else {
+                    $script:LastSkipped = ''
                 }
 
-                $commit = Invoke-Git @('commit', '-m', $message)
-                if ($commit.Code -eq 0) {
-                    Write-Log "committed: $message"
-                } else {
-                    Write-Log ("commit failed: " + (($commit.Output) -join ' '))
+                $staged = (Invoke-Git @('diff', '--cached', '--name-only')).Output
+                if ($staged.Count -gt 0 -and ($staged -join '').Trim().Length -gt 0) {
+                    $commit = Invoke-Git @('commit', '-m', $message)
+                    if ($commit.Code -eq 0) {
+                        Write-Log "committed: $message"
+                    } else {
+                        Write-Log ("commit failed: " + (($commit.Output) -join ' '))
+                    }
                 }
             }
         }
