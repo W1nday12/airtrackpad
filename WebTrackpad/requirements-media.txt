@@ -1,0 +1,18 @@
+# AirTrackpad — OPTIONAL dependencies for the media "island" (media_control.py).
+#
+# media_control.py imports winrt lazily (inside functions), so the base
+# environment from requirements.txt works without these packages: the
+# /api/media endpoint then simply reports "no active session".
+#
+# Install only if you want Now Playing / media controls:
+#   .venv\Scripts\python.exe -m pip install -r requirements-media.txt
+#
+# Requirements: Windows 10/11 (WinRT projection), Python 3.13.
+# Tested: Python 3.13.14, winrt-runtime 4.0.3, Windows SDK projection
+# 10.0.28000.2705. If a newer winrt release fails to install, pin an older
+# version from https://pypi.org/project/winrt-Windows.Media.Control/
+winrt-runtime==4.0.3
+winrt-Windows.Foundation==4!10.0.28000.2705
+winrt-Windows.Foundation.Collections==4!10.0.28000.2705
+winrt-Windows.Storage.Streams==4!10.0.28000.2705
+winrt-Windows.Media.Control==4!10.0.28000.2705
