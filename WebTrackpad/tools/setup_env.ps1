@@ -43,12 +43,48 @@ function Write-Ok   { param([string]$Message) Write-Host "[+] $Message" -Foregro
 function Write-Warn { param([string]$Message) Write-Host "[!] $Message" -ForegroundColor Yellow }
 function Write-Err  { param([string]$Message) Write-Host "[X] $Message" -ForegroundColor Red }
 
+# Запуск внешней программы. В Windows PowerShell 5.1 при $ErrorActionPreference = 'Stop'
+# любая запись нативного процесса в stderr превращается в исключение, поэтому на время
+# вызова временно включаем 'Continue', а результат проверяем по $LASTEXITCODE.
+function Invoke-Tool {
+    param(
+        [Parameter(Mandatory = $true)][string]$Exe,
+        [string[]]$Arguments = @()
+    )
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Exe @Arguments
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
+}
+
+# То же, но с перехватом stdout/stderr и кода возврата.
+function Invoke-ToolCaptured {
+    param(
+        [Parameter(Mandatory = $true)][string]$Exe,
+        [string[]]$Arguments = @()
+    )
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $output = @()
+    $exitCode = 1
+    try {
+        $output = @(& $Exe @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedEap
+    }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
+}
+
 function Find-BasePython {
     # 1) обычный "python" в PATH (в том числе алиас Microsoft Store)
     $cmd = Get-Command python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($cmd -and $cmd.Source) {
-        & $cmd.Source --version 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
+        $r = Invoke-ToolCaptured -Exe $cmd.Source -Arguments @('--version')
+        if ($r.ExitCode -eq 0) {
             $script:BasePythonExe  = $cmd.Source
             $script:BasePythonArgs = @()
             return $true
@@ -57,8 +93,8 @@ function Find-BasePython {
     # 2) лаунчер "py -3"
     $cmd = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($cmd -and $cmd.Source) {
-        & $cmd.Source -3 --version 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
+        $r = Invoke-ToolCaptured -Exe $cmd.Source -Arguments @('-3', '--version')
+        if ($r.ExitCode -eq 0) {
             $script:BasePythonExe  = $cmd.Source
             $script:BasePythonArgs = @('-3')
             return $true
@@ -69,16 +105,16 @@ function Find-BasePython {
 
 function Test-VenvImports {
     param([string]$PythonExe)
-    & $PythonExe -c "import websockets, qrcode, PIL" 2>&1 | Out-Null
-    return ($LASTEXITCODE -eq 0)
+    $r = Invoke-ToolCaptured -Exe $PythonExe -Arguments @('-c', 'import websockets, qrcode, PIL')
+    return ($r.ExitCode -eq 0)
 }
 
 function Get-VenvVersions {
     param([string]$PythonExe)
-    $code = 'import sys, importlib.metadata as m; print(sys.version.split()[0]); print(m.version("websockets")); print(m.version("qrcode")); print(m.version("pillow"))'
-    $out = & $PythonExe -c $code 2>&1
-    if ($LASTEXITCODE -ne 0) { return @() }
-    return @($out | ForEach-Object { $_.ToString().Trim() })
+    $code = "import sys, importlib.metadata as m; print(sys.version.split()[0]); print(m.version('websockets')); print(m.version('qrcode')); print(m.version('pillow'))"
+    $r = Invoke-ToolCaptured -Exe $PythonExe -Arguments @('-c', $code)
+    if ($r.ExitCode -ne 0) { return @() }
+    return @($r.Output | ForEach-Object { $_.ToString().Trim() })
 }
 
 function Remove-BrokenVenv {
@@ -156,8 +192,9 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     $venvArgs = @()
     $venvArgs += $script:BasePythonArgs
     $venvArgs += @('-m', 'venv', $VenvDir)
-    & $script:BasePythonExe @venvArgs
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $VenvPython)) {
+    Invoke-Tool -Exe $script:BasePythonExe -Arguments $venvArgs
+    $venvRc = $LASTEXITCODE
+    if ($venvRc -ne 0 -or -not (Test-Path -LiteralPath $VenvPython)) {
         Write-Err 'Не удалось создать виртуальное окружение .venv.'
         Write-Err 'Проверьте, что Python 3.10+ установлен и поддерживает модуль venv.'
         exit 1
@@ -167,15 +204,17 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
 
 # --- pip upgrade -----------------------------------------------------------
 Write-Step 'Обновляю pip в .venv...'
-& $VenvPython -m pip install --disable-pip-version-check --quiet --upgrade pip
-if ($LASTEXITCODE -ne 0) {
+Invoke-Tool -Exe $VenvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--quiet', '--upgrade', 'pip')
+$pipRc = $LASTEXITCODE
+if ($pipRc -ne 0) {
     Write-Warn 'Не удалось обновить pip — продолжаю с уже установленной версией.'
 }
 
 # --- зависимости -----------------------------------------------------------
 Write-Step 'Устанавливаю зависимости из requirements.txt...'
-& $VenvPython -m pip install --disable-pip-version-check --requirement $ReqFile
-if ($LASTEXITCODE -ne 0) {
+Invoke-Tool -Exe $VenvPython -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '--requirement', $ReqFile)
+$reqRc = $LASTEXITCODE
+if ($reqRc -ne 0) {
     Write-Err 'Не удалось установить зависимости из requirements.txt.'
     Write-Err 'Проверьте подключение к интернету и повторите запуск.'
     exit 1
