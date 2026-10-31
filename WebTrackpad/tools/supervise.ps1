@@ -47,27 +47,46 @@ function Rotate-LogIfNeeded {
     } catch { }
 }
 
+function Test-VenvHealthy {
+    param([string]$PythonExe)
+    # A half-removed venv still has python.exe but loses pyvenv.cfg; such a
+    # python cannot start at all ("failed to locate pyvenv.cfg").
+    $venvRoot = Split-Path -Parent (Split-Path -Parent $PythonExe)
+    return (Test-Path -LiteralPath (Join-Path $venvRoot 'pyvenv.cfg'))
+}
+
+function Invoke-SetupEnv {
+    $setup = Join-Path $ToolsDir 'setup_env.ps1'
+    if (-not (Test-Path -LiteralPath $setup)) { return }
+    Say 'Окружение не готово — запускаю setup_env.ps1'
+    if ($Hidden) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup 2>&1 |
+            ForEach-Object { Write-Raw ([string]$_) }
+    } else {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup
+    }
+}
+
 function Resolve-Python {
     if ($PythonPath -and (Test-Path -LiteralPath $PythonPath)) {
         return (Resolve-Path -LiteralPath $PythonPath).Path
     }
     $venvPy = Join-Path $AppDir '.venv\Scripts\python.exe'
-    if (Test-Path -LiteralPath $venvPy) { return $venvPy }
-
-    $setup = Join-Path $ToolsDir 'setup_env.ps1'
-    if (Test-Path -LiteralPath $setup) {
+    if ((Test-Path -LiteralPath $venvPy) -and (Test-VenvHealthy $venvPy)) { return $venvPy }
+    if (Test-Path -LiteralPath $venvPy) {
+        Say 'Виртуальное окружение повреждено (нет pyvenv.cfg) — пересоздаю.'
+    } else {
         Say 'Виртуальное окружение не найдено — создаю через setup_env.ps1'
-        if ($Hidden) {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup 2>&1 |
-                ForEach-Object { Write-Raw ([string]$_) }
-        } else {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup
-        }
-        if (Test-Path -LiteralPath $venvPy) { return $venvPy }
     }
 
+    Invoke-SetupEnv
+    if ((Test-Path -LiteralPath $venvPy) -and (Test-VenvHealthy $venvPy)) { return $venvPy }
+
     $cmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+    if ($cmd) {
+        Say 'Использую системный Python (venv недоступен).'
+        return $cmd.Source
+    }
     return $null
 }
 
