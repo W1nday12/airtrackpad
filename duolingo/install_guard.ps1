@@ -1,4 +1,4 @@
-# Installs / removes the daily "Duolingo Streak Guard" scheduled task.
+﻿# Installs / removes the daily "Duolingo Streak Guard" scheduled task.
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File install_guard.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File install_guard.ps1 -Time 23:50

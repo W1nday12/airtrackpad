@@ -1,5 +1,0 @@
-requests
-rich
-pytz
-python-dateutil
-tzlocal

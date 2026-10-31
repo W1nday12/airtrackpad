@@ -23,3 +23,9 @@ desktop.ini
 # This launcher lives outside the WebTrackpad project folder and is not part
 # of the repository (only WebTrackpad/ is published for now).
 /Запустить Трекпад.bat
+
+# Duolingo streak guard: the JWT token is a password-equivalent secret and the
+# research folder is third-party code. Never publish these.
+/duolingo/config.json
+/duolingo/state.json
+/duolingo/_research/

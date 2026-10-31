@@ -1,4 +1,4 @@
-# Removes the daily "Duolingo Streak Guard" scheduled task.
+﻿# Removes the daily "Duolingo Streak Guard" scheduled task.
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File uninstall_guard.ps1
 
 [CmdletBinding()]

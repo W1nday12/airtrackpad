@@ -28,6 +28,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+# Console may be a cp1252 pipe or absent (pythonw): make output UTF-8 and safe.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        if _stream is not None:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
 CONFIG_PATH = HERE / "config.json"
 STATE_PATH = HERE / "state.json"
 LOG_DIR = HERE / "logs"
