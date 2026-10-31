@@ -3486,73 +3486,182 @@
       return badge;
     }
 
-    // Last list we painted. The PC pushes the same state every few seconds;
-    // re-painting identical content would make every icon flicker, so the
-    // dock is only rebuilt when something actually changed.
-    let appsSignature = '';
+    // The PC re-sends its window list every few seconds in Z-order, so a window
+    // that gets focused (for example after tapping its icon) used to jump to the
+    // top of the dock. The dock now keeps its own stable order: tiles never move
+    // once they are on screen, they are only updated in place, added at the end
+    // or removed. Scroll position is preserved as well.
     let pinnedApps = [];
     let pendingLaunchId = '';
     let pendingLaunchTimer = null;
+    let appOrder = [];               // stable tile keys, first seen order
+    const appNodes = new Map();      // key -> .app-item element
+    let appsEmptyEl = null;
 
-    function appsStateSignature(windows, pinnedOnly) {
-      return JSON.stringify([
-        windows.map(win => [win.hwnd, win.title, win.exe || '', win.icon_id || '']),
-        pinnedOnly.map(app => [app.id, app.name, app.exe || '', app.icon_id || ''])
-      ]);
-    }
-
-    function makeAppItem(options) {
+    function makeAppItem() {
       const item = document.createElement('div');
       item.className = 'app-item';
-      if (options.running) item.classList.add('running');
-      if (options.active) item.classList.add('active');
-      if (options.pinnedId) item.classList.add('pinned');
-      if (options.launching) item.classList.add('launching');
       item.setAttribute('role', 'button');
-      item.setAttribute('aria-label', options.label);
-      item.title = options.label;
+      item._app = null;
+      item._iconId = '';
+      item.addEventListener('click', () => {
+        if (item._app) onAppTileClick(item, item._app);
+      });
+      return item;
+    }
 
-      if (options.iconId) {
+    function paintAppIcon(item, iconId, label) {
+      const letter = (String(label || '').trim().charAt(0) || '?').toUpperCase();
+      const nextId = iconId || '';
+      if (item._iconId === nextId && item.firstElementChild) {
+        if (!nextId) {
+          const badge = item.firstElementChild;
+          if (badge.classList.contains('app-icon-badge') && badge.textContent !== letter) {
+            badge.textContent = letter;
+          }
+        }
+        return;
+      }
+      item._iconId = nextId;
+      while (item.firstChild) item.removeChild(item.firstChild);
+      if (nextId) {
         const img = document.createElement('img');
         img.className = 'app-icon';
         // 256 px PNG served once and cached by the browser for a year.
-        img.src = '/api/icon/' + options.iconId;
+        img.src = '/api/icon/' + nextId;
         img.alt = '';
         img.draggable = false;
         img.decoding = 'async';
-        img.addEventListener('error', () => img.replaceWith(makeLetterBadge(options.label)), { once: true });
+        img.addEventListener('error', () => {
+          img.replaceWith(makeLetterBadge(item._app ? item._app.label : label));
+        }, { once: true });
         item.appendChild(img);
       } else {
-        item.appendChild(makeLetterBadge(options.label));
+        item.appendChild(makeLetterBadge(label));
       }
+    }
 
-      item.addEventListener('click', () => {
-        flushInput();
-        if (options.pinnedId) {
-          // A taskbar pin that is not running: launch it on the PC.
-          haptic.click();
-          pendingLaunchId = options.pinnedId;
-          item.classList.add('launching');
-          showHUD('Запуск: ' + options.label);
-          send({ type: 'launch_app', id: options.pinnedId, name: options.label });
-          clearTimeout(pendingLaunchTimer);
-          pendingLaunchTimer = setTimeout(() => { pendingLaunchId = ''; }, 8000);
-          toggleAppsSidebar(false);
-          // Windows starts the process asynchronously; refresh the dock a
-          // couple of times so the new window (and its dot) appears.
-          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 700);
-          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 1900);
-          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 3600);
-          return;
-        }
-        haptic.click();
-        // The server focuses the window, or minimizes it when it is already
-        // in front (second tap on the same icon).
-        send({ type: 'focus_window', hwnd: options.hwnd, title: options.windowTitle });
+    function updateAppItem(item, app) {
+      item._app = app;
+      item.title = app.label;
+      item.setAttribute('aria-label', app.label);
+      item.classList.toggle('running', !!app.running);
+      item.classList.toggle('active', !!app.active);
+      item.classList.toggle('pinned', !!app.pinnedId);
+      item.classList.toggle('launching', !!app.launching);
+      if (app.running && app.hwnd) {
+        item.dataset.hwnd = String(app.hwnd);
+      } else {
+        delete item.dataset.hwnd;
+      }
+      paintAppIcon(item, app.iconId, app.label);
+    }
+
+    function onAppTileClick(item, app) {
+      if (!app) return;
+      flushInput();
+      haptic.click();
+      if (app.pinnedId) {
+        // A taskbar pin that is not running: launch it on the PC.
+        pendingLaunchId = app.pinnedId;
+        item.classList.add('launching');
+        showHUD('Запуск: ' + app.label);
+        send({ type: 'launch_app', id: app.pinnedId, name: app.label });
+        clearTimeout(pendingLaunchTimer);
+        pendingLaunchTimer = setTimeout(() => { pendingLaunchId = ''; }, 8000);
         toggleAppsSidebar(false);
-      });
+        // Windows starts the process asynchronously; refresh the dock a couple
+        // of times so the new window (and its dot) appears.
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 700);
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 1900);
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 3600);
+        return;
+      }
+      // The server focuses the window, or minimizes it when it is already in
+      // front (second tap on the same icon).
+      send({ type: 'focus_window', hwnd: app.hwnd, title: app.label });
+      toggleAppsSidebar(false);
+    }
 
-      return item;
+    // Stable identity for a tile: the application itself when the server knows
+    // the exe (so a pinned app keeps its slot when it starts running), or the
+    // window handle as a fallback. Extra windows of the same app get #2, #3...
+    function dockKey(exe, fallback) {
+      const name = (exe || '').toLowerCase();
+      return name ? 'exe:' + name : fallback;
+    }
+
+    function collectDockApps(list, pinnedOnly, activeId) {
+      const apps = [];
+      const perExe = new Map();
+      list.forEach(win => {
+        const exe = (win.exe || '').toLowerCase();
+        let key;
+        if (exe) {
+          const count = (perExe.get(exe) || 0) + 1;
+          perExe.set(exe, count);
+          key = count === 1 ? 'exe:' + exe : 'exe:' + exe + '#' + count;
+        } else {
+          key = 'w:' + win.hwnd;
+        }
+        apps.push({
+          key: key,
+          label: win.title || 'Приложение',
+          iconId: win.icon_id,
+          running: true,
+          active: activeId !== null && Number(win.hwnd) === activeId,
+          hwnd: win.hwnd,
+          pinnedId: '',
+          launching: false,
+        });
+      });
+      pinnedOnly.forEach(app => {
+        apps.push({
+          key: dockKey(app.exe, 'p:' + app.id),
+          label: app.name || 'Приложение',
+          iconId: app.icon_id,
+          running: false,
+          active: false,
+          hwnd: 0,
+          pinnedId: app.id,
+          launching: pendingLaunchId === app.id,
+        });
+      });
+      return apps;
+    }
+
+    function stableAppOrder(apps) {
+      const byKey = new Map(apps.map(app => [app.key, app]));
+      const seen = new Set();
+      const ordered = [];
+      appOrder.forEach(key => {
+        if (byKey.has(key) && !seen.has(key)) {
+          seen.add(key);
+          ordered.push(byKey.get(key));
+        }
+      });
+      apps.forEach(app => {
+        if (!seen.has(app.key)) {
+          seen.add(app.key);
+          ordered.push(app);
+        }
+      });
+      appOrder = ordered.map(app => app.key);
+      return ordered;
+    }
+
+    function ensureEmptyState() {
+      if (!appsEmptyEl) {
+        appsEmptyEl = document.createElement('div');
+        appsEmptyEl.className = 'apps-empty';
+        appsEmptyEl.title = 'Нет приложений';
+        appsEmptyEl.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+          '<rect x="3" y="5" width="18" height="14" rx="2.5"></rect>' +
+          '<path d="M3 9h18"></path>' +
+          '</svg>';
+      }
+      if (appsEmptyEl.parentNode !== appsList) appsList.appendChild(appsEmptyEl);
     }
 
     function renderAppsList(windows, pinned) {
@@ -3580,70 +3689,53 @@
         pinnedOnly.push(app);
       });
 
-      const signature = appsStateSignature(list, pinnedOnly);
       const focused = list.find(win => win.focused);
       const activeId = focused ? Number(focused.hwnd) : null;
-
-      if (signature === appsSignature) {
-        // Same content: only the highlight can have changed.
-        setActiveApp(activeId);
-        return;
-      }
-      appsSignature = signature;
-
-      appsList.innerHTML = '';
-
-      if (list.length === 0 && pinnedOnly.length === 0) {
-        activeHwnd = null;
-        const empty = document.createElement('div');
-        empty.className = 'apps-empty';
-        empty.title = 'Нет приложений';
-        empty.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-          '<rect x="3" y="5" width="18" height="14" rx="2.5"></rect>' +
-          '<path d="M3 9h18"></path>' +
-          '</svg>';
-        appsList.appendChild(empty);
-        return;
-      }
-
       activeHwnd = activeId;
-      let index = 0;
 
-      list.forEach(win => {
-        const title = win.title || 'Приложение';
-        const item = makeAppItem({
-          label: title,
-          windowTitle: title,
-          iconId: win.icon_id,
-          running: true,
-          active: Number(win.hwnd) === activeId,
-          hwnd: win.hwnd,
-          pinnedId: '',
-          launching: false,
-        });
-        item.dataset.hwnd = String(win.hwnd);
-        item.style.setProperty('--i', String(index++));
-        item.classList.add('enter');
-        appsList.appendChild(item);
+      const apps = stableAppOrder(collectDockApps(list, pinnedOnly, activeId));
+
+      if (apps.length === 0) {
+        for (const [key, el] of Array.from(appNodes)) {
+          el.remove();
+          appNodes.delete(key);
+        }
+        appOrder = [];
+        ensureEmptyState();
+        activeHwnd = null;
+        return;
+      }
+      if (appsEmptyEl) {
+        appsEmptyEl.remove();
+        appsEmptyEl = null;
+      }
+
+      const alive = new Set(apps.map(app => app.key));
+      for (const [key, el] of Array.from(appNodes)) {
+        if (!alive.has(key)) {
+          el.remove();
+          appNodes.delete(key);
+        }
+      }
+
+      const prevScroll = appsList.scrollTop;
+      let added = 0;
+      apps.forEach(app => {
+        let item = appNodes.get(app.key);
+        const isNew = !item;
+        if (isNew) {
+          item = makeAppItem();
+          item.dataset.key = app.key;
+          item.style.setProperty('--i', String(added++));
+          item.classList.add('enter');
+          appNodes.set(app.key, item);
+          appsList.appendChild(item);
+        }
+        updateAppItem(item, app);
       });
 
-      pinnedOnly.forEach(app => {
-        const name = app.name || 'Приложение';
-        const item = makeAppItem({
-          label: name,
-          windowTitle: '',
-          iconId: app.icon_id,
-          running: false,
-          active: false,
-          hwnd: 0,
-          pinnedId: app.id,
-          launching: pendingLaunchId === app.id,
-        });
-        item.style.setProperty('--i', String(index++));
-        item.classList.add('enter');
-        appsList.appendChild(item);
-      });
+      // Keep the list visually still: no jumps to the top on refresh.
+      appsList.scrollTop = Math.min(prevScroll, Math.max(0, appsList.scrollHeight - appsList.clientHeight));
 
       setActiveApp(activeHwnd);
     }
