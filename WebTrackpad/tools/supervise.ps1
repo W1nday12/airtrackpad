@@ -27,7 +27,7 @@ $script:StopFlag = Join-Path $LogDir '.stop'
 function Write-Raw {
     param([string]$Text)
     if ($NoLog) { return }
-    try { Add-Content -LiteralPath $script:LogPath -Value $Text -ErrorAction Stop } catch { }
+    try { Add-Content -LiteralPath $script:LogPath -Value $Text -Encoding UTF8 -ErrorAction Stop } catch { }
 }
 
 function Say {
