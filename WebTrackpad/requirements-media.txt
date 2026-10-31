@@ -1,4 +1,4 @@
-# AirTrackpad — OPTIONAL dependencies for the media "island" (media_control.py).
+# AirTrackpad OPTIONAL dependencies for the media "island" (media_control.py).
 #
 # media_control.py imports winrt lazily (inside functions), so the base
 # environment from requirements.txt works without these packages: the

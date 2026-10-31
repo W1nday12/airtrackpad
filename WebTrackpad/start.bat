@@ -1,31 +1,42 @@
 @echo off
 chcp 65001 >nul
-set PYTHONIOENCODING=utf-8
+setlocal
+set "PYTHONIOENCODING=utf-8"
 title AirTrackpad Server
 cd /d "%~dp0"
 
-rem Pick the Python launcher if available, otherwise fall back to python.exe.
-set "PY=python"
-py -3 -c "import sys" >nul 2>nul && set "PY=py -3"
+set "VENV_PY=%~dp0.venv\Scripts\python.exe"
 
-%PY% --version >nul 2>nul
-if errorlevel 1 (
-    echo [X] Python not found. Install Python 3.10+ from https://python.org
-    echo     and enable "Add Python to PATH" during installation.
-    pause
-    exit /b 1
-)
-
-%PY% -c "import websockets, qrcode, PIL" >nul 2>nul
-if errorlevel 1 (
-    echo [*] Installing required packages...
-    %PY% -m pip install --disable-pip-version-check -r requirements.txt
+rem Create the local virtual environment on first run.
+if not exist "%VENV_PY%" (
+    echo [*] Local environment not found. Setting up .venv ...
+    if not exist "%~dp0tools\setup_env.ps1" (
+        echo [X] Missing tools\setup_env.ps1 - cannot create the environment.
+        pause
+        exit /b 1
+    )
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\setup_env.ps1"
     if errorlevel 1 (
-        echo [X] Could not install dependencies. Check your internet connection.
+        echo.
+        echo [X] Environment setup failed. Check the messages above.
         pause
         exit /b 1
     )
 )
 
-%PY% server.py
-pause
+if not exist "%VENV_PY%" (
+    echo [X] Python interpreter not found: %VENV_PY%
+    echo     Delete the .venv folder and run start.bat again.
+    pause
+    exit /b 1
+)
+
+"%VENV_PY%" server.py
+if errorlevel 1 (
+    echo.
+    echo [X] Server stopped with an error.
+    pause
+    exit /b 1
+)
+
+endlocal
