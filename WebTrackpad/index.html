@@ -1,0 +1,3971 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>AirTrackpad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0c">
+  <meta name="mobile-web-app-capable" content="yes">
+  <style>
+    :root {
+      --bg: #0a0a0c;
+      --card-bg: rgba(28, 28, 30, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --trackpad-surface: linear-gradient(180deg, #18191d 0%, #111215 100%);
+      --accent: #2997ff;
+      --accent-soft: rgba(41, 151, 255, 0.18);
+      --text: #f5f5f7;
+      --text-sub: #86868b;
+      --green: #30d158;
+      --red: #ff453a;
+
+      /* Safe areas. Android Chrome reports the display cutout here when the
+         page is allowed to draw edge-to-edge (fullscreen / installed app). */
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+
+      /* iPhone Motion: Apple's spring-ish curves. Everything animates with
+         these, so the whole UI shares one physical "feel". */
+      --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+      --ease-out-ios: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+      --dur-fast: 160ms;
+      --dur: 280ms;
+      --dur-slow: 420ms;
+
+      /* Fixed-height band the Dynamic Island lives in. It is reserved even
+         when nothing plays, so the header never jumps up and down. */
+      --island-band: 42px;
+      --header-h: 52px;
+      --island-bg: #050507;
+    }
+
+    /* White theme — same layout, light surfaces. */
+    :root[data-theme="light"] {
+      --bg: #eef0f4;
+      --card-bg: rgba(255, 255, 255, 0.82);
+      --card-border: rgba(0, 0, 0, 0.08);
+      --trackpad-surface: linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%);
+      --accent: #007aff;
+      --accent-soft: rgba(0, 122, 255, 0.14);
+      --text: #15151a;
+      --text-sub: #6b6b73;
+    }
+
+    :root[data-theme="light"] header {
+      background: rgba(255, 255, 255, 0.75);
+    }
+
+    :root[data-theme="light"] #shortcuts-bar {
+      background: rgba(255, 255, 255, 0.85);
+    }
+
+    :root[data-theme="light"] .shortcut-chip {
+      background: rgba(0, 0, 0, 0.045);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    :root[data-theme="light"] .shortcut-chip:active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    :root[data-theme="light"] .btn-icon:active,
+    :root[data-theme="light"] .btn-icon.active {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    :root[data-theme="light"] .touch-glow {
+      background: radial-gradient(circle, rgba(0, 0, 0, 0.09) 0%, rgba(0, 0, 0, 0) 70%);
+    }
+
+    :root[data-theme="light"] #hud-banner {
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    :root[data-theme="light"] .click-surface {
+      background: rgba(0, 0, 0, 0.035);
+    }
+
+    :root[data-theme="light"] .click-surface:active,
+    :root[data-theme="light"] .click-surface.active {
+      background: rgba(0, 0, 0, 0.08);
+      border-color: rgba(0, 0, 0, 0.16);
+    }
+
+    :root[data-theme="light"] .sheet-modal {
+      background: rgba(242, 242, 247, 0.9);
+    }
+
+    :root[data-theme="light"] .inset-row,
+    :root[data-theme="light"] .gesture-item {
+      border-bottom-color: rgba(0, 0, 0, 0.06);
+    }
+
+    :root[data-theme="light"] .gesture-icon-badge {
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    :root[data-theme="light"] input[type="range"] {
+      background: rgba(0, 0, 0, 0.13);
+    }
+
+    :root[data-theme="light"] input[type="range"]::-webkit-slider-thumb {
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    }
+
+    :root[data-theme="light"] input:not(:checked) + .switch-slider {
+      background-color: rgba(0, 0, 0, 0.15);
+    }
+
+    :root[data-theme="light"] .app-item {
+      background: rgba(0, 0, 0, 0.035);
+      border-color: rgba(0, 0, 0, 0.07);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    :root[data-theme="light"] .app-item:active {
+      background: rgba(0, 0, 0, 0.09);
+    }
+
+    :root[data-theme="light"] .app-icon {
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+    }
+
+    :root[data-theme="light"] .apps-empty {
+      border-color: rgba(0, 0, 0, 0.16);
+      color: rgba(0, 0, 0, 0.35);
+    }
+
+    :root[data-theme="light"] .conn-url-btn {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: rgba(0, 0, 0, 0.08);
+    }
+
+    :root[data-theme="light"] .conn-url-btn:active {
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    :root[data-theme="light"] #conn-banner {
+      background: rgba(255, 59, 48, 0.1);
+      border-color: rgba(255, 59, 48, 0.38);
+      color: #c1121f;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      touch-action: manipulation;
+      letter-spacing: -0.01em;
+      transition: background-color var(--dur-slow) ease, color var(--dur-slow) ease;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      padding-left: var(--safe-left);
+      padding-right: var(--safe-right);
+      position: relative;
+    }
+
+    /* Minimalist Apple Glass Header */
+    header {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 14px;
+      background: rgba(10, 10, 12, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 30;
+      transition: background-color var(--dur-slow) ease, border-color var(--dur-slow) ease, height var(--dur) var(--ease-ios);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      flex: 0 1 auto;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .status-dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(48, 209, 88, 0.6);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      color: var(--text-sub);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-ios), opacity var(--dur-fast) ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-icon:active, .btn-icon.active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+      transform: scale(0.9);
+    }
+
+    .btn-icon svg {
+      width: 19px;
+      height: 19px;
+      stroke-width: 1.75;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Shortcuts Floating Bar */
+    #shortcuts-bar {
+      display: none;
+      padding: 10px 16px;
+      background: rgba(20, 20, 23, 0.85);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-bottom: 1px solid var(--card-border);
+      overflow-x: auto;
+      white-space: nowrap;
+      gap: 8px;
+      z-index: 25;
+      scrollbar-width: none;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition:
+        opacity 200ms ease,
+        transform 300ms var(--ease-ios),
+        display 300ms allow-discrete,
+        background-color var(--dur-slow) ease,
+        border-color var(--dur-slow) ease;
+    }
+
+    #shortcuts-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    #shortcuts-bar.visible {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @starting-style {
+      #shortcuts-bar.visible {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+    }
+
+    #shortcuts-bar {
+      touch-action: pan-x;
+    }
+
+    .shortcut-chip {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-ios);
+    }
+
+    .shortcut-chip:active {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: scale(0.96);
+    }
+
+    /* Trackpad Glass Surface */
+    #trackpad-wrap {
+      flex: 1;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    #trackpad {
+      flex: 1;
+      border-radius: 24px;
+      background: var(--trackpad-surface);
+      border: 1px solid var(--card-border);
+      box-shadow: 
+        inset 0 1px 1px rgba(255, 255, 255, 0.06),
+        0 12px 36px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+
+    #trackpad.dragging {
+      border-color: var(--accent);
+      box-shadow: 
+        inset 0 0 24px var(--accent-soft),
+        0 0 25px rgba(41, 151, 255, 0.25);
+    }
+
+    /* Minimalist touch glow */
+    .touch-glow {
+      position: absolute;
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0) 70%);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .touch-glow.active {
+      opacity: 1;
+    }
+
+    /* Apple-style floating HUD banner */
+    #hud-banner {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-6px) scale(0.86);
+      background: rgba(30, 30, 35, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      pointer-events: none;
+      opacity: 0;
+      transition:
+        opacity 180ms ease,
+        transform 340ms var(--ease-spring),
+        background-color var(--dur-slow) ease,
+        border-color var(--dur-slow) ease;
+      z-index: 50;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      will-change: transform, opacity;
+    }
+
+    #hud-banner.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    /* Optional Physical Buttons Bar */
+    #buttons-bar {
+      display: none;
+      gap: 10px;
+      margin-top: 12px;
+      height: 50px;
+    }
+
+    .click-surface {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      color: var(--text-sub);
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .click-surface:active, .click-surface.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      transform: scale(0.98);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Apple-style Sheet Modal: slides up from the bottom with the same spring
+       curve as iOS and slides back down when dismissed. */
+    .sheet-modal {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      z-index: 100;
+      padding: calc(var(--safe-top) + 16px) 20px calc(var(--safe-bottom) + 20px);
+      flex-direction: column;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(26px) scale(0.985);
+      transform-origin: 50% 100%;
+      transition:
+        opacity 240ms ease,
+        transform 420ms var(--ease-ios),
+        display 420ms allow-discrete;
+      will-change: transform, opacity;
+    }
+
+    .sheet-modal.visible {
+      display: flex;
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Opening state for browsers that support discrete display transitions. */
+    @starting-style {
+      .sheet-modal.visible {
+        opacity: 0;
+        transform: translateY(26px) scale(0.985);
+      }
+    }
+
+    /* Long sheets scroll instead of squeezing their sections together. */
+    .sheet-modal > * {
+      flex-shrink: 0;
+    }
+
+    .sheet-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .sheet-title {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .sheet-done {
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 600;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* iOS Inset Grouped Section */
+    .inset-group {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .inset-row {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .inset-row:last-child {
+      border-bottom: none;
+    }
+
+    .row-flex {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .row-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .row-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    .row-badge {
+      font-size: 14px;
+      color: var(--accent);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Gestures Guide Item */
+    .gesture-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .gesture-item:last-child {
+      border-bottom: none;
+    }
+
+    .gesture-icon-badge {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .gesture-info {
+      flex: 1;
+    }
+
+    .gesture-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .gesture-desc {
+      font-size: 12px;
+      color: var(--text-sub);
+      line-height: 1.4;
+    }
+
+    /* iOS Slider */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+    }
+
+    /* iOS Cupertino Switch */
+    .cupertino-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 30px;
+    }
+
+    .cupertino-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+      border-radius: 30px;
+    }
+
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.16, 1, 0.3, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    input:checked + .switch-slider {
+      background-color: var(--green);
+    }
+
+    input:checked + .switch-slider:before {
+      transform: translateX(20px);
+    }
+
+    #hidden-input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      top: 0; left: 0;
+      height: 1px; width: 1px;
+    }
+
+    /* Apps Dock — same surface as the trackpad, icon-only tiles */
+    #apps-sidebar {
+      position: fixed;
+      top: calc(var(--safe-top) + 66px);
+      bottom: calc(var(--safe-bottom) + 14px);
+      left: -116px;
+      width: 88px;
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 0;
+      border-radius: 24px;
+      border: 1px solid var(--card-border);
+      background: var(--trackpad-surface);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.06),
+        0 12px 36px rgba(0, 0, 0, 0.4);
+      transition:
+        left 420ms var(--ease-spring),
+        opacity 260ms ease,
+        background-color var(--dur-slow) ease,
+        border-color var(--dur-slow) ease;
+      overflow: hidden;
+    }
+
+    #apps-sidebar.visible {
+      left: 12px;
+    }
+
+    #apps-list {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 2px 0;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      scrollbar-width: none;
+    }
+
+    #apps-list::-webkit-scrollbar {
+      display: none;
+    }
+
+    .app-item {
+      position: relative;
+      flex-shrink: 0;
+      width: 62px;
+      height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 17px;
+      background: rgba(255, 255, 255, 0.065);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      cursor: pointer;
+      transition:
+        transform 260ms var(--ease-spring),
+        background-color 180ms ease,
+        border-color 180ms ease,
+        box-shadow 220ms ease;
+    }
+
+    .app-item:active {
+      transform: scale(0.86);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* New tiles pop in with a small stagger instead of snapping. */
+    .app-item.enter {
+      animation: appItemIn 380ms var(--ease-spring) backwards;
+      animation-delay: calc(var(--i, 0) * 30ms);
+    }
+
+    @keyframes appItemIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.84);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* A running application (taskbar semantics): small dot under the icon. */
+    .app-item.running::after {
+      content: "";
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.42);
+      transform: translateX(-50%);
+      transition: background-color 220ms ease, width 220ms var(--ease-spring), height 220ms var(--ease-spring);
+    }
+
+    /* A pinned app that is not running: shown a little quieter, like a
+       taskbar pin, and it has no running dot. */
+    .app-item.pinned:not(.running) {
+      opacity: 0.82;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    .app-item.pinned:not(.running):active {
+      opacity: 1;
+    }
+
+    /* The window currently in the foreground on the PC. */
+    .app-item.active {
+      border-color: var(--accent);
+      box-shadow:
+        0 0 0 2px var(--accent-soft),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .app-item.active::after {
+      content: "";
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      transform: translateX(-50%);
+    }
+
+    /* Launched pinned app: pulse once while Windows starts it. */
+    .app-item.launching {
+      animation: appLaunchPulse 900ms var(--ease-ios) infinite;
+    }
+
+    @keyframes appLaunchPulse {
+      0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 0 0 0 rgba(41, 151, 255, 0); }
+      50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 0 0 3px rgba(41, 151, 255, 0.22); }
+    }
+
+    .app-icon {
+      width: 46px;
+      height: 46px;
+      flex-shrink: 0;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+    }
+
+    .app-icon-badge {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Empty state: a ghost window glyph, no text. */
+    .apps-empty {
+      width: 62px;
+      height: 62px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 17px;
+      border: 1px dashed rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.34);
+    }
+
+    .apps-empty svg {
+      width: 26px;
+      height: 26px;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      fill: none;
+    }
+
+    #sidebar-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 55;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #sidebar-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Connection diagnostics */
+    #conn-banner {
+      position: fixed;
+      top: calc(var(--safe-top) + var(--island-band) + var(--header-h) + 6px);
+      left: 50%;
+      transform: translate(-50%, -8px) scale(0.94);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(255, 69, 58, 0.16);
+      border: 1px solid rgba(255, 69, 58, 0.45);
+      color: #ffd9d6;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition:
+        opacity 220ms ease,
+        transform 380ms var(--ease-spring),
+        background-color var(--dur-slow) ease,
+        border-color var(--dur-slow) ease;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    #conn-banner.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, 0) scale(1);
+    }
+
+    #conn-banner .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ff453a;
+      flex-shrink: 0;
+    }
+
+    .conn-block {
+      margin-top: 8px;
+    }
+
+    .conn-hint {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text-sub);
+      white-space: normal;
+      padding-top: 4px;
+    }
+
+    .conn-url-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .conn-url-btn:active {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .conn-url-btn small {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-sub);
+      font-size: 11px;
+    }
+
+    .conn-action {
+      margin-top: 16px;
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .conn-action:active {
+      opacity: 0.8;
+    }
+
+    #row-connection {
+      cursor: pointer;
+    }
+
+    /* ---------- Music island (Dynamic Island style) ---------- */
+    /* The island is a real Dynamic Island: a constant-height band is always
+       reserved at the top of the app, so when music starts or stops the header
+       underneath never moves. The capsule itself springs in and out inside
+       that band, and tapping it morphs it into the full player card. */
+    #island {
+      position: relative;
+      flex-shrink: 0;
+      height: var(--island-band);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 45;
+      pointer-events: none;
+      contain: layout style;
+    }
+
+    #island-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      height: 30px;
+      max-width: min(78vw, 300px);
+      padding: 0 13px 0 3px;
+      border: none;
+      border-radius: 999px;
+      background: var(--island-bg);
+      color: #f5f5f7;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 4px 14px rgba(0, 0, 0, 0.45);
+      cursor: pointer;
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(-3px) scale(0.62);
+      transform-origin: center;
+      transition:
+        transform var(--dur) var(--ease-spring),
+        opacity var(--dur-fast) ease,
+        box-shadow var(--dur-fast) ease;
+      will-change: transform, opacity;
+    }
+
+    #island.visible #island-pill {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Exiting: shrink back into the status bar like the real island. */
+    #island.hiding #island-pill {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.7);
+      transition:
+        transform 240ms var(--ease-ios),
+        opacity 180ms ease;
+    }
+
+    #island-pill:active {
+      transform: scale(0.94);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    /* A new track makes the capsule "breathe" once, like the island does. */
+    #island.bump #island-pill {
+      animation: islandBump 460ms var(--ease-spring);
+    }
+
+    @keyframes islandBump {
+      0% { transform: scale(1); }
+      28% { transform: scale(1.055); }
+      60% { transform: scale(0.985); }
+      100% { transform: scale(1); }
+    }
+
+    #island.paused #island-pill {
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+        0 3px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    /* While the player is expanded the capsule is gone: the card *is* the
+       island, grown out of it (same trick as iOS). */
+    #island.island-expanded #island-pill {
+      opacity: 0;
+      transform: scale(0.88);
+      pointer-events: none;
+      transition: opacity 120ms ease, transform 160ms var(--ease-ios);
+    }
+
+    .island-art {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background-color: #1c1c20;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+    }
+
+    .island-title-compact {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+
+    .island-eq {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+      padding-right: 2px;
+    }
+
+    .island-eq i {
+      width: 2px;
+      height: 4px;
+      border-radius: 1px;
+      background: var(--green);
+      animation: islandEq 0.9s ease-in-out infinite;
+    }
+
+    .island-eq i:nth-child(2) { animation-delay: 0.15s; }
+    .island-eq i:nth-child(3) { animation-delay: 0.3s; }
+
+    #island.paused .island-eq i {
+      animation-play-state: paused;
+      height: 3px;
+      opacity: 0.55;
+    }
+
+    @keyframes islandEq {
+      0%, 100% { height: 3px; }
+      50% { height: 11px; }
+    }
+
+    /* Expanded card. It is the pill itself growing: the card starts as a tiny
+       capsule in the band and springs into place, its content fading in a beat
+       later — the same morph the iPhone Dynamic Island does. */
+    #island-card {
+      position: fixed;
+      top: calc(var(--safe-top) + 4px);
+      left: 50%;
+      z-index: 96;
+      width: min(92vw, 372px);
+      padding: 0 15px 15px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: var(--island-bg);
+      color: #f5f5f7;
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 18px 48px rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(-6px) scale(0.3);
+      transform-origin: 50% 0;
+      transition:
+        transform var(--dur-slow) var(--ease-spring),
+        opacity 200ms ease,
+        border-radius 320ms var(--ease-ios),
+        box-shadow var(--dur) ease;
+      will-change: transform, opacity;
+    }
+
+    #island-card.open {
+      opacity: 1;
+      pointer-events: auto;
+      border-radius: 28px;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    /* Following the finger while dragging the card down. */
+    #island-card.dragging {
+      transition: none;
+    }
+
+    /* Card content fades in after the capsule has grown, and out first when
+       collapsing — that is what makes the morph read as one object. */
+    #island-card > * {
+      opacity: 0;
+      transition: opacity 160ms ease;
+    }
+
+    #island-card.open > * {
+      opacity: 1;
+      transition: opacity 220ms ease 90ms;
+    }
+
+    .island-grabber {
+      width: 34px;
+      height: 4px;
+      margin: 8px auto 6px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.26);
+    }
+
+    .island-card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .island-cover {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      flex-shrink: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 22px;
+    }
+
+    .island-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .island-app {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.52);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .island-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .island-artist {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.55);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .island-collapse {
+      align-self: flex-start;
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-ios), background-color var(--dur-fast) ease;
+    }
+
+    .island-collapse:active {
+      transform: scale(0.86);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .island-progress {
+      height: 4px;
+      margin: 14px 0 6px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+
+    #island-progress-fill {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: 2px;
+      background: #ffffff;
+      transition: width 500ms linear;
+    }
+
+    .island-times {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .island-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 26px;
+      margin-top: 10px;
+    }
+
+    .island-controls button {
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 50%;
+      background: none;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-ios), background-color var(--dur-fast) ease, opacity var(--dur-fast) ease;
+    }
+
+    .island-controls button:active {
+      transform: scale(0.88);
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .island-controls button[disabled] {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .island-controls svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+
+    .island-controls #island-play {
+      background: #ffffff;
+      color: #050507;
+      width: 48px;
+      height: 48px;
+    }
+
+    .island-controls #island-play svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Landscape: the app panel is docked to the left and always visible,
+       just like the Windows taskbar, so the trackpad keeps the rest of the
+       screen. Portrait keeps the slide-in behaviour. */
+    @media (orientation: landscape) and (min-width: 600px) {
+      :root {
+        --island-band: 34px;
+        --header-h: 44px;
+      }
+
+      #app {
+        padding-left: calc(96px + var(--safe-left));
+        padding-right: var(--safe-right);
+      }
+
+      #apps-sidebar {
+        /* Clear the camera punch-hole when the page is drawn edge-to-edge in
+           landscape: the dock is the only full-height element on the left, so
+           it is the one element the cutout would otherwise sit on top of. */
+        left: calc(12px + var(--safe-left));
+        top: calc(var(--safe-top) + 52px);
+        bottom: calc(var(--safe-bottom) + 8px);
+        width: 74px;
+        padding: 8px 0;
+      }
+
+      #sidebar-backdrop,
+      #btn-apps-dock {
+        display: none;
+      }
+
+      #apps-list {
+        gap: 7px;
+        padding: 1px 0;
+      }
+
+      .app-item {
+        width: 54px;
+        height: 54px;
+        border-radius: 15px;
+      }
+
+      .app-icon,
+      .app-icon-badge {
+        width: 40px;
+        height: 40px;
+      }
+
+      .app-icon-badge {
+        font-size: 16px;
+        border-radius: 10px;
+      }
+
+      .apps-empty {
+        width: 54px;
+        height: 54px;
+        border-radius: 15px;
+      }
+
+      .apps-empty svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      #trackpad-wrap {
+        padding: 8px;
+      }
+
+      #trackpad {
+        border-radius: 20px;
+      }
+
+      #island-pill {
+        height: 26px;
+        padding: 0 11px 0 2px;
+        max-width: min(60vw, 320px);
+      }
+
+      .island-art {
+        width: 22px;
+        height: 22px;
+      }
+
+      .island-title-compact {
+        max-width: 220px;
+      }
+
+      #island-card {
+        width: min(70vw, 380px);
+        /* Keep the card centred over the trackpad column, not the whole
+           screen: the dock occupies the left 96 px. */
+        left: calc(50% + (96px + var(--safe-left) - var(--safe-right)) / 2);
+      }
+
+      #conn-banner {
+        left: auto;
+        right: calc(20px + var(--safe-right));
+        transform: translateY(-8px) scale(0.94);
+      }
+
+      #conn-banner.visible {
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Pixel 9 portrait: 411 x 923 CSS px. Six header actions + the brand do
+       not fit at desktop sizes, so the whole top bar is tightened up. */
+    @media (max-width: 430px) {
+      :root {
+        --island-band: 38px;
+        --header-h: 48px;
+      }
+
+      header {
+        padding: 0 11px;
+        gap: 6px;
+      }
+
+      .brand {
+        gap: 7px;
+      }
+
+      .brand-title {
+        font-size: 14px;
+      }
+
+      .btn-icon {
+        width: 32px;
+        height: 32px;
+      }
+
+      .btn-icon svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      #trackpad-wrap {
+        padding: 10px;
+      }
+
+      #trackpad {
+        border-radius: 22px;
+      }
+
+      #apps-sidebar {
+        width: 84px;
+      }
+
+      .app-item {
+        width: 60px;
+        height: 60px;
+      }
+
+      .app-icon,
+      .app-icon-badge {
+        width: 44px;
+        height: 44px;
+      }
+
+      #island-card {
+        width: min(93vw, 372px);
+      }
+
+      #conn-banner {
+        max-width: calc(100vw - 24px);
+      }
+    }
+
+    /* Short landscape phone (Pixel 9 rotated): keep vertical chrome minimal. */
+    @media (orientation: landscape) and (max-height: 520px) {
+      :root {
+        --island-band: 32px;
+        --header-h: 42px;
+      }
+
+      header {
+        padding: 0 10px;
+      }
+
+      .btn-icon {
+        width: 32px;
+        height: 32px;
+      }
+
+      .btn-icon svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      #trackpad-wrap {
+        padding: 6px;
+      }
+    }
+
+    /* Desktop / tablet preview: a little more air. */
+    @media (min-width: 431px) and (orientation: portrait) {
+      :root {
+        --island-band: 44px;
+        --header-h: 54px;
+      }
+
+      .btn-icon {
+        width: 38px;
+        height: 38px;
+      }
+
+      .btn-icon svg {
+        width: 19px;
+        height: 19px;
+      }
+    }
+
+    /* Edge-to-edge drawing (Fullscreen button / installed app). The Pixel 9
+       punch-hole sits in the middle of the top edge in portrait and near the
+       left edge in landscape; both are given real clearance so the island and
+       the app dock never sit underneath the camera. */
+    @media (display-mode: fullscreen), (display-mode: standalone) {
+      :root {
+        --safe-top: max(env(safe-area-inset-top, 0px), 24px);
+      }
+    }
+
+    @media (display-mode: fullscreen) and (orientation: portrait),
+           (display-mode: standalone) and (orientation: portrait) {
+      :root {
+        --safe-top: max(env(safe-area-inset-top, 0px), 56px);
+      }
+    }
+
+    @media (display-mode: fullscreen) and (orientation: landscape),
+           (display-mode: standalone) and (orientation: landscape) {
+      :root {
+        --safe-top: max(env(safe-area-inset-top, 0px), 6px);
+        --safe-left: max(env(safe-area-inset-left, 0px), 68px);
+        --safe-right: max(env(safe-area-inset-right, 0px), 16px);
+      }
+    }
+
+    /* The Fullscreen API does not always flip display-mode, so the touch
+       fullscreen handler below tags <html> itself and these rules take over.
+       data-cutout tells the layout which edge the camera is on. */
+    html.edge-to-edge[data-cutout="top"] {
+      --safe-top: max(env(safe-area-inset-top, 0px), 56px);
+    }
+
+    html.edge-to-edge[data-cutout="left"] {
+      --safe-top: max(env(safe-area-inset-top, 0px), 6px);
+      --safe-left: max(env(safe-area-inset-left, 0px), 68px);
+      --safe-right: max(env(safe-area-inset-right, 0px), 16px);
+    }
+
+    html.edge-to-edge[data-cutout="right"] {
+      --safe-top: max(env(safe-area-inset-top, 0px), 6px);
+      --safe-left: max(env(safe-area-inset-left, 0px), 16px);
+      --safe-right: max(env(safe-area-inset-right, 0px), 68px);
+    }
+
+    /* Respect the system "reduce motion" accessibility setting. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+  <script>
+    // Apply the saved theme before first paint to avoid a dark flash.
+    try {
+      if (localStorage.getItem('apple_theme') === 'light') {
+        document.documentElement.dataset.theme = 'light';
+      }
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="conn-banner" role="status">
+    <span class="dot"></span>
+    <span>Нет связи с ПК</span>
+    <span style="opacity: 0.7">·</span>
+    <span style="font-weight: 600">Что делать?</span>
+  </div>
+
+  <div id="app">
+    <!-- Music island: a Dynamic-Island style capsule, only while a player runs -->
+    <div id="island" aria-live="polite">
+      <button id="island-pill" type="button" aria-label="Управление музыкой">
+        <span class="island-art" id="island-art"></span>
+        <span class="island-title-compact" id="island-title-compact"></span>
+        <span class="island-eq" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
+    </div>
+
+    <!-- Minimalist Glass Header -->
+    <header>
+      <div class="brand">
+        <div id="status-dot" class="status-dot"></div>
+        <span class="brand-title">Trackpad</span>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Open Apps Dock Button -->
+        <button id="btn-apps-dock" class="btn-icon" title="Открытые приложения">
+          <svg viewBox="0 0 24 24">
+            <rect x="2" y="3" width="5" height="18" rx="1"></rect>
+            <rect x="9" y="3" width="13" height="18" rx="2"></rect>
+          </svg>
+        </button>
+
+        <!-- Gestures Guide Button -->
+        <button id="btn-guide" class="btn-icon" title="Справочник жестов">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+
+        <!-- Shortcuts Drawer -->
+        <button id="btn-shortcuts" class="btn-icon" title="Действия">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+        </button>
+
+        <!-- Keyboard Trigger -->
+        <button id="btn-keyboard" class="btn-icon" title="Клавиатура">
+          <svg viewBox="0 0 24 24">
+            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+            <line x1="6" y1="9" x2="6" y2="9"></line>
+            <line x1="10" y1="9" x2="10" y2="9"></line>
+            <line x1="14" y1="9" x2="14" y2="9"></line>
+            <line x1="18" y1="9" x2="18" y2="9"></line>
+            <line x1="6" y1="13" x2="6" y2="13"></line>
+            <line x1="18" y1="13" x2="18" y2="13"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+        </button>
+
+        <!-- Fullscreen -->
+        <button id="btn-fullscreen" class="btn-icon" title="На весь экран">
+          <svg viewBox="0 0 24 24">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+        </button>
+
+        <!-- Settings -->
+        <button id="btn-settings" class="btn-icon" title="Настройки">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Left Apps Dock (icon-only liquid glass) -->
+    <div id="sidebar-backdrop"></div>
+    <div id="apps-sidebar" aria-label="Открытые приложения">
+      <div id="apps-list"></div>
+    </div>
+
+    <!-- Quick Shortcuts Drawer -->
+    <div id="shortcuts-bar">
+      <div class="shortcut-chip" data-action="mission_control">Mission Control</div>
+      <div class="shortcut-chip" data-action="show_desktop">Рабочий стол</div>
+      <div class="shortcut-chip" data-action="notification_center">Уведомления</div>
+      <div class="shortcut-chip" data-action="alt_tab">Alt + Tab</div>
+      <div class="shortcut-chip" data-action="play_pause">Пауза / Плей</div>
+      <div class="shortcut-chip" data-action="volume_up">Громче</div>
+      <div class="shortcut-chip" data-action="volume_down">Тише</div>
+      <div class="shortcut-chip" data-action="volume_mute">Без звука</div>
+      <div class="shortcut-chip" data-action="escape">Esc</div>
+    </div>
+
+    <!-- Apple Trackpad Surface -->
+    <div id="trackpad-wrap">
+      <div id="trackpad">
+        <div id="glow-1" class="touch-glow"></div>
+        <div id="glow-2" class="touch-glow"></div>
+        <div id="hud-banner">Mission Control</div>
+      </div>
+
+      <!-- Optional Physical Buttons Bar -->
+      <div id="buttons-bar">
+        <div id="btn-left-click" class="click-surface">ЛКМ</div>
+        <div id="btn-right-click" class="click-surface">ПКМ</div>
+      </div>
+    </div>
+
+    <!-- Expanded music player -->
+    <div id="island-card" role="dialog" aria-label="Плеер" aria-hidden="true">
+      <div class="island-grabber" aria-hidden="true"></div>
+      <div class="island-card-top">
+        <div class="island-cover" id="island-cover">♪</div>
+        <div class="island-meta">
+          <div class="island-app" id="island-app">—</div>
+          <div class="island-name" id="island-name">—</div>
+          <div class="island-artist" id="island-artist"></div>
+        </div>
+        <button class="island-collapse" id="island-collapse" aria-label="Свернуть">×</button>
+      </div>
+
+      <div class="island-progress"><span id="island-progress-fill"></span></div>
+      <div class="island-times">
+        <span id="island-pos">0:00</span>
+        <span id="island-dur">0:00</span>
+      </div>
+
+      <div class="island-controls">
+        <button id="island-prev" aria-label="Предыдущий трек">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zm12 0v14l-9-7z"></path></svg>
+        </button>
+        <button id="island-play" aria-label="Пуск / пауза">
+          <svg id="island-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+          <svg id="island-pause-icon" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M7 5h4v14H7zm6 0h4v14h-4z"></path></svg>
+        </button>
+        <button id="island-next" aria-label="Следующий трек">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM6 5l9 7-9 7z"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Hidden Native Keyboard Input -->
+    <input type="text" id="hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+
+    <!-- Gestures Guide Sheet Modal -->
+    <div id="guide-modal" class="sheet-modal">
+      <div class="sheet-nav">
+        <div class="sheet-title">Жесты трекпада</div>
+        <button id="btn-close-guide" class="sheet-done">Готово</button>
+      </div>
+
+      <div class="inset-group">
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">👆 1п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Щелчок нажатием</div>
+            <div class="gesture-desc">Тапните одним пальцем для обычного клика (ЛКМ).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">✌️ 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Вспомогательное нажатие (ПКМ)</div>
+            <div class="gesture-desc">Тапните двумя пальцами для правого клика.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">✌️ 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Смарт-масштабирование</div>
+            <div class="gesture-desc">Двойной тап двумя пальцами увеличивает/уменьшает масштаб.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">↕️ 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Прокрутка</div>
+            <div class="gesture-desc">Смахните двумя пальцами вверх или вниз для плавного скролла.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">🤏 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Масштабирование (Pinch)</div>
+            <div class="gesture-desc">Сведите или разведите два пальца для масштабирования (Ctrl+Wheel).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">🔄 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Поворот</div>
+            <div class="gesture-desc">Поверните два пальца друг вокруг друга для поворота объекта.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">↔️ 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Переход между страницами</div>
+            <div class="gesture-desc">Смахните двумя пальцами влево или вправо (Назад / Вперёд).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">👈 2п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Центр уведомлений</div>
+            <div class="gesture-desc">Смахните двумя пальцами от правого края экрана влево (Win+N).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">✋ 3п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Перетаскивание тремя пальцами</div>
+            <div class="gesture-desc">Коснитесь тремя пальцами и двигайте для перетаскивания окон и файлов.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">🔍 3п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Поиск (Look up)</div>
+            <div class="gesture-desc">Тапните тремя пальцами для открытия поиска Windows (Win+S).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">👐 4п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Отображение рабочего стола</div>
+            <div class="gesture-desc">Разведите 4 пальца в стороны для показа рабочего стола (Win+D).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">✊ 4п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Приложения (Launchpad)</div>
+            <div class="gesture-desc">Сведите 4 пальца вместе для открытия меню Пуск / Приложений.</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">⬆️ 4п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Mission Control</div>
+            <div class="gesture-desc">Смахните 4 пальцами вверх для просмотра задач (Win+Tab).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">⬇️ 4п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Exposé</div>
+            <div class="gesture-desc">Смахните 4 пальцами вниз для переключения окон (Alt+Tab).</div>
+          </div>
+        </div>
+
+        <div class="gesture-item">
+          <div class="gesture-icon-badge">⏩ 4п</div>
+          <div class="gesture-info">
+            <div class="gesture-name">Переход между рабочими столами</div>
+            <div class="gesture-desc">Смахните 4 пальцами влево или вправо для смены рабочего стола.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iOS Inset Grouped Settings Sheet -->
+    <div id="settings-modal" class="sheet-modal">
+      <div class="sheet-nav">
+        <div class="sheet-title">Настройки</div>
+        <button id="btn-close-settings" class="sheet-done">Готово</button>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Белая тема</div>
+              <div class="row-sub">Светлое оформление интерфейса</div>
+            </div>
+            <label class="cupertino-switch">
+              <input type="checkbox" id="switch-light-theme">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row">
+          <div class="row-flex">
+            <span class="row-title">Чувствительность</span>
+            <span id="val-sensitivity" class="row-badge">1.4x</span>
+          </div>
+          <input type="range" id="slider-sensitivity" min="0.5" max="3.5" step="0.1" value="1.4">
+        </div>
+
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Ускорение курсора</div>
+              <div class="row-sub">Кинетическая кривая macOS</div>
+            </div>
+            <span id="val-acceleration" class="row-badge">1.6x</span>
+          </div>
+          <input type="range" id="slider-acceleration" min="1.0" max="2.5" step="0.1" value="1.6">
+        </div>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row">
+          <div class="row-flex">
+            <span class="row-title">Скорость скролла</span>
+            <span id="val-scroll-speed" class="row-badge">1.2x</span>
+          </div>
+          <input type="range" id="slider-scroll-speed" min="0.4" max="2.5" step="0.1" value="1.2">
+        </div>
+
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Натуральный скролл</div>
+              <div class="row-sub">Скролл как на Mac и iPhone</div>
+            </div>
+            <label class="cupertino-switch">
+              <input type="checkbox" id="switch-natural-scroll" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Haptic Settings for Pixel 9 & LRA Motors -->
+      <div class="inset-group">
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Тактильный отклик (Haptic)</div>
+              <div class="row-sub">Сверхточные импульсы Taptic / Pixel</div>
+            </div>
+            <label class="cupertino-switch">
+              <input type="checkbox" id="switch-vibrate" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Характер клика</div>
+              <div class="row-sub">Настройка под линейный вибромотор Pixel 9</div>
+            </div>
+            <span id="val-haptic-profile" class="row-badge">Pixel 9 (Ультра-чёткий)</span>
+          </div>
+          <input type="range" id="slider-haptic-profile" min="1" max="3" step="1" value="1">
+        </div>
+
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Тактильный скролл (колёсико)</div>
+              <div class="row-sub">Микро-щелчки при прокрутке двумя пальцами</div>
+            </div>
+            <label class="cupertino-switch">
+              <input type="checkbox" id="switch-scroll-haptics" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="inset-row">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Физические кнопки</div>
+              <div class="row-sub">Кнопки ЛКМ / ПКМ снизу</div>
+            </div>
+            <label class="cupertino-switch">
+              <input type="checkbox" id="switch-buttons-bar">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row" id="row-connection">
+          <div class="row-flex">
+            <div>
+              <div class="row-title">Подключение</div>
+              <div class="row-sub">Адреса сервера, VPN, брандмауэр</div>
+            </div>
+            <span id="conn-badge" class="row-badge">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="conn-modal" class="sheet-modal">
+      <div class="sheet-nav">
+        <div class="sheet-title">Подключение</div>
+        <button id="btn-close-conn" class="sheet-done">Готово</button>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row">
+          <div class="row-flex">
+            <span class="row-title">Текущий адрес</span>
+            <span id="conn-current" class="row-badge">—</span>
+          </div>
+        </div>
+        <div class="inset-row">
+          <div class="row-flex">
+            <span class="row-title">Связь с ПК</span>
+            <span id="conn-status" class="row-badge">Проверка…</span>
+          </div>
+        </div>
+        <div class="inset-row">
+          <div class="row-flex">
+            <span class="row-title">Задержка</span>
+            <span id="conn-latency" class="row-badge">—</span>
+          </div>
+          <div class="conn-hint">
+            Замер по WebSocket. До 20 мс — прямое подключение по Wi-Fi.
+            Больше 60 мс или большой джиттер — трафик идёт через VPN/туннель.
+            Отключите VPN на телефоне, переподключитесь и сравните цифры.
+          </div>
+        </div>
+      </div>
+
+      <div class="inset-group" id="conn-urls-group">
+        <div class="inset-row">
+          <div class="row-title">Адреса сервера</div>
+          <div class="conn-hint" id="conn-urls-hint">Загрузка…</div>
+          <div id="conn-urls" class="conn-block"></div>
+        </div>
+      </div>
+
+      <div class="inset-group">
+        <div class="inset-row">
+          <div>
+            <div class="row-title">Если включён VPN</div>
+            <div class="conn-hint">
+              • На телефоне отключите VPN или включите «обход локальной сети»
+              (split tunneling) для этого Wi-Fi.<br>
+              • На ПК в VPN включите доступ к локальной сети (LAN) и отключите
+              kill switch.<br>
+              • Либо подключите телефон к той же VPN и откройте адрес
+              VPN-адаптера из списка.
+            </div>
+          </div>
+        </div>
+        <div class="inset-row" id="conn-tailscale-row" style="display: none;">
+          <div>
+            <div class="row-title">Tailscale</div>
+            <div class="conn-hint" id="conn-tailscale"></div>
+          </div>
+        </div>
+        <div class="inset-row">
+          <div>
+            <div class="row-title">Брандмауэр Windows</div>
+            <div class="conn-hint" id="conn-firewall">
+              Если страница не открывается даже без VPN — запустите на ПК
+              «Разрешить доступ в брандмауэре.bat» от имени администратора.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-reconnect" class="conn-action">Проверить снова</button>
+    </div>
+  </div>
+
+  <script>
+    // Configuration & State
+    function readNumber(key, fallback, min, max) {
+      const value = parseFloat(localStorage.getItem(key));
+      if (!Number.isFinite(value)) return fallback;
+      return Math.min(max, Math.max(min, value));
+    }
+
+    const config = {
+      sensitivity: readNumber('apple_sens', 1.4, 0.5, 3.5),
+      acceleration: readNumber('apple_accel', 1.6, 1.0, 2.5),
+      scrollSpeed: readNumber('apple_scroll', 1.2, 0.4, 2.5),
+      naturalScroll: localStorage.getItem('apple_natural') !== 'false',
+      vibrate: localStorage.getItem('apple_vibrate') !== 'false',
+      hapticProfile: Math.round(readNumber('pixel_haptic_profile', 1, 1, 3)),
+      scrollHaptics: localStorage.getItem('pixel_scroll_haptics') !== 'false',
+      showButtons: localStorage.getItem('apple_buttons') === 'true'
+    };
+
+    // Theme (the saved value was already applied before first paint).
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+
+    function applyTheme(light) {
+      document.documentElement.dataset.theme = light ? 'light' : 'dark';
+      if (themeMeta) themeMeta.setAttribute('content', light ? '#eef0f4' : '#0a0a0c');
+      try { localStorage.setItem('apple_theme', light ? 'light' : 'dark'); } catch (e) {}
+    }
+
+    const HAPTIC_PROFILE_NAMES = {
+      1: "Pixel 9 (Ультра-чёткий)",
+      2: "MacBook (Сбалансированный)",
+      3: "Глубокий (Heavy)"
+    };
+
+    // Advanced Pixel 9 Haptic Engine
+    // Generates ultra-crisp micro-transients tailored for Linear Resonant Actuators
+    const haptic = {
+      canVibrate() {
+        return config.vibrate && typeof navigator !== 'undefined' && Boolean(navigator.vibrate);
+      },
+
+      // Ultra-short micro-tick for scroll notches & sliders (2-4ms)
+      tick() {
+        if (!this.canVibrate()) return;
+        const ms = config.hapticProfile === 1 ? 3 : (config.hapticProfile === 2 ? 5 : 8);
+        try { navigator.vibrate(ms); } catch (e) {}
+      },
+
+      // Snappy mechanical click for 1-finger primary tap (4-6ms)
+      click() {
+        if (!this.canVibrate()) return;
+        const ms = config.hapticProfile === 1 ? 5 : (config.hapticProfile === 2 ? 8 : 12);
+        try { navigator.vibrate(ms); } catch (e) {}
+      },
+
+      // Secondary click (2-finger tap): crisp double-micro impulse
+      secondary() {
+        if (!this.canVibrate()) return;
+        const pat = config.hapticProfile === 1 ? [4, 18, 4] : (config.hapticProfile === 2 ? [7, 20, 6] : [10, 24, 10]);
+        try { navigator.vibrate(pat); } catch (e) {}
+      },
+
+      // Drag engage (latch / pickup object)
+      latch() {
+        if (!this.canVibrate()) return;
+        const pat = config.hapticProfile === 1 ? [3, 10, 6] : (config.hapticProfile === 2 ? [5, 12, 9] : [8, 14, 14]);
+        try { navigator.vibrate(pat); } catch (e) {}
+      },
+
+      // Drag release
+      release() {
+        if (!this.canVibrate()) return;
+        const ms = config.hapticProfile === 1 ? 4 : (config.hapticProfile === 2 ? 6 : 9);
+        try { navigator.vibrate(ms); } catch (e) {}
+      },
+
+      // System gesture confirmation (Mission Control, Desktop, etc.)
+      gesture() {
+        if (!this.canVibrate()) return;
+        const pat = config.hapticProfile === 1 ? [5, 20, 5] : (config.hapticProfile === 2 ? [8, 22, 8] : [12, 25, 12]);
+        try { navigator.vibrate(pat); } catch (e) {}
+      },
+
+      // Notification Center edge snap
+      edgeSnap() {
+        if (!this.canVibrate()) return;
+        const pat = config.hapticProfile === 1 ? [4, 12, 8] : (config.hapticProfile === 2 ? [7, 14, 12] : [10, 16, 16]);
+        try { navigator.vibrate(pat); } catch (e) {}
+      },
+
+      // UI button tap
+      ui() {
+        if (!this.canVibrate()) return;
+        const ms = config.hapticProfile === 1 ? 3 : (config.hapticProfile === 2 ? 5 : 8);
+        try { navigator.vibrate(ms); } catch (e) {}
+      }
+    };
+
+    // DOM Elements
+    const trackpad = document.getElementById('trackpad');
+    const statusDot = document.getElementById('status-dot');
+    const buttonsBar = document.getElementById('buttons-bar');
+    const shortcutsBar = document.getElementById('shortcuts-bar');
+    const settingsModal = document.getElementById('settings-modal');
+    const guideModal = document.getElementById('guide-modal');
+    const hiddenInput = document.getElementById('hidden-input');
+    const hudBanner = document.getElementById('hud-banner');
+    const glow1 = document.getElementById('glow-1');
+    const glow2 = document.getElementById('glow-2');
+
+    // Connection diagnostics
+    const connBanner = document.getElementById('conn-banner');
+    const connModal = document.getElementById('conn-modal');
+    const btnCloseConn = document.getElementById('btn-close-conn');
+    const btnReconnect = document.getElementById('btn-reconnect');
+    const rowConnection = document.getElementById('row-connection');
+    const connCurrent = document.getElementById('conn-current');
+    const connStatus = document.getElementById('conn-status');
+    const connBadge = document.getElementById('conn-badge');
+    const connUrls = document.getElementById('conn-urls');
+    const connUrlsHint = document.getElementById('conn-urls-hint');
+    const connFirewall = document.getElementById('conn-firewall');
+    const connTailscaleRow = document.getElementById('conn-tailscale-row');
+    const connTailscale = document.getElementById('conn-tailscale');
+    const connLatency = document.getElementById('conn-latency');
+
+    // UI Buttons
+    const btnGuide = document.getElementById('btn-guide');
+    const btnCloseGuide = document.getElementById('btn-close-guide');
+    const btnShortcuts = document.getElementById('btn-shortcuts');
+    const btnKeyboard = document.getElementById('btn-keyboard');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    const btnSettings = document.getElementById('btn-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const btnLeftClick = document.getElementById('btn-left-click');
+    const btnRightClick = document.getElementById('btn-right-click');
+
+    // Settings Controls
+    const sliderSens = document.getElementById('slider-sensitivity');
+    const valSens = document.getElementById('val-sensitivity');
+    const sliderAccel = document.getElementById('slider-acceleration');
+    const valAccel = document.getElementById('val-acceleration');
+    const sliderScroll = document.getElementById('slider-scroll-speed');
+    const valScroll = document.getElementById('val-scroll-speed');
+    const switchNatural = document.getElementById('switch-natural-scroll');
+    const switchVibrate = document.getElementById('switch-vibrate');
+    const sliderHapticProfile = document.getElementById('slider-haptic-profile');
+    const valHapticProfile = document.getElementById('val-haptic-profile');
+    const switchScrollHaptics = document.getElementById('switch-scroll-haptics');
+    const switchButtons = document.getElementById('switch-buttons-bar');
+    const switchLightTheme = document.getElementById('switch-light-theme');
+
+    // Apply config
+    sliderSens.value = config.sensitivity;
+    valSens.textContent = config.sensitivity.toFixed(1) + 'x';
+    sliderAccel.value = config.acceleration;
+    valAccel.textContent = config.acceleration.toFixed(1) + 'x';
+    sliderScroll.value = config.scrollSpeed;
+    valScroll.textContent = config.scrollSpeed.toFixed(1) + 'x';
+    switchNatural.checked = config.naturalScroll;
+    switchVibrate.checked = config.vibrate;
+    sliderHapticProfile.value = config.hapticProfile;
+    valHapticProfile.textContent = HAPTIC_PROFILE_NAMES[config.hapticProfile] || "Pixel 9 (Ультра-чёткий)";
+    switchScrollHaptics.checked = config.scrollHaptics;
+    switchButtons.checked = config.showButtons;
+    buttonsBar.style.display = config.showButtons ? 'flex' : 'none';
+    switchLightTheme.checked = document.documentElement.dataset.theme === 'light';
+
+    let hudTimer = null;
+    function showHUD(text) {
+      hudBanner.textContent = text;
+      hudBanner.classList.add('show');
+      clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => hudBanner.classList.remove('show'), 900);
+    }
+
+    // WebSocket Client
+    let ws = null;
+    let wsConnected = false;
+    let connBannerTimer = null;
+
+    function showConnBanner(show) {
+      connBanner.classList.toggle('visible', !!show);
+    }
+
+    function scheduleConnBanner() {
+      if (connBannerTimer || wsConnected) return;
+      connBannerTimer = setTimeout(() => {
+        connBannerTimer = null;
+        if (!wsConnected) {
+          showConnBanner(true);
+          updateConnStatus();
+        }
+      }, 2500);
+    }
+
+    function clearConnBannerTimer() {
+      if (connBannerTimer) {
+        clearTimeout(connBannerTimer);
+        connBannerTimer = null;
+      }
+    }
+
+    // --- Latency probe ------------------------------------------------------
+    // Measures the real WebSocket round trip, which is what the finger feels.
+    // Direct Wi-Fi is usually 2–10 ms; a VPN-routed local network shows tens
+    // or hundreds of milliseconds and a much larger jitter.
+    let rttTimer = null;
+    let rttSamples = [];
+    let pingSeq = 0;
+    let pendingPings = new Map();
+
+    function startRttProbe() {
+      if (rttTimer) return;
+      rttTimer = setInterval(() => {
+        if (!wsConnected) return;
+        const id = ++pingSeq;
+        pendingPings.set(id, performance.now());
+        rawSend({ type: 'ping', id });
+        if (pendingPings.size > 5) {
+          pendingPings.delete(pendingPings.keys().next().value);
+        }
+      }, 2000);
+    }
+
+    function stopRttProbe() {
+      if (rttTimer) {
+        clearInterval(rttTimer);
+        rttTimer = null;
+      }
+      rttSamples = [];
+      pendingPings.clear();
+      renderLatency();
+    }
+
+    function onPong(id) {
+      const sentAt = pendingPings.get(id);
+      if (sentAt === undefined) return;
+      pendingPings.delete(id);
+      rttSamples.push(performance.now() - sentAt);
+      if (rttSamples.length > 8) rttSamples.shift();
+      renderLatency();
+    }
+
+    function renderLatency() {
+      if (!connLatency) return;
+      if (!rttSamples.length) {
+        connLatency.textContent = wsConnected ? 'измерение…' : '—';
+        connLatency.style.color = '';
+        return;
+      }
+      const avg = rttSamples.reduce((a, b) => a + b, 0) / rttSamples.length;
+      const jitter = Math.max(...rttSamples) - Math.min(...rttSamples);
+      connLatency.textContent = `${Math.round(avg)} мс · джиттер ${Math.round(jitter)} мс`;
+      const bad = avg > 60 || jitter > 20;
+      connLatency.style.color = bad ? '#ff6b60' : 'var(--accent)';
+      if (wsConnected && connBadge) {
+        connBadge.textContent = `подключено · ${Math.round(avg)} мс`;
+      }
+    }
+
+    function updateConnStatus() {
+      if (!connStatus || !connBadge) return;
+      connStatus.textContent = wsConnected ? 'Подключено' : 'Нет связи';
+      connStatus.style.color = wsConnected ? 'var(--accent)' : '#ff6b60';
+      connBadge.textContent = wsConnected ? 'подключено' : 'нет связи';
+      connBadge.style.color = wsConnected ? 'var(--accent)' : '#ff6b60';
+      connCurrent.textContent = location.host || '—';
+    }
+
+    const connKindLabels = {
+      wifi: 'Wi-Fi',
+      ethernet: 'Ethernet',
+      vpn: 'VPN',
+      tailscale: 'Tailscale',
+      virtual: 'виртуальный',
+    };
+
+    function renderConnUrls(data) {
+      const current = location.origin;
+      const urls = Array.isArray(data.urls) ? data.urls : [];
+      connUrls.innerHTML = '';
+
+      if (!urls.length) {
+        connUrlsHint.textContent = 'ПК не сообщил ни одного адреса.';
+        return;
+      }
+
+      connUrlsHint.textContent = data.vpn
+        ? 'Обнаружен VPN. Используйте адрес Wi-Fi/Ethernet, а VPN-адрес — только если телефон подключён к той же VPN.'
+        : 'Нажмите адрес, чтобы открыть трекпад через него.';
+
+      urls.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'conn-url-btn';
+
+        const isCurrent = item.url.replace(/\/$/, '') === current;
+        const kind = connKindLabels[item.kind] || item.kind;
+        btn.textContent = item.url;
+        const sub = document.createElement('small');
+        sub.textContent = `${item.label} · ${kind}${item.recommended ? ' · рекомендуется' : ''}${isCurrent ? ' · открыт сейчас' : ''}`;
+        btn.appendChild(sub);
+
+        btn.addEventListener('click', () => {
+          if (isCurrent) return;
+          location.href = item.url;
+        });
+
+        connUrls.appendChild(btn);
+      });
+    }
+
+    async function loadNetworkInfo() {
+      updateConnStatus();
+      try {
+        const res = await fetch('/api/network', { cache: 'no-store' });
+        const data = await res.json();
+        renderConnUrls(data);
+
+        if (data.firewall === 'ok' || data.firewall === 'added') {
+          connFirewall.textContent = `Правило для порта ${data.port} создано — входящие подключения разрешены.`;
+          connFirewall.style.color = 'var(--accent)';
+        } else {
+          connFirewall.textContent = 'Правило не создано. Запустите на ПК «Разрешить доступ в брандмауэре.bat» от имени администратора.';
+          connFirewall.style.color = '';
+        }
+
+        const ts = data.tailscale || {};
+        if (ts.installed) {
+          connTailscaleRow.style.display = '';
+          if (ts.running) {
+            const ip = (ts.ips && ts.ips.length) ? ts.ips[0] : '';
+            connTailscale.textContent = `Включён${ip ? ' · ' + ip : ''}. Работает из любой сети: откройте адрес Tailscale из списка выше (Tailscale нужен и на телефоне).`;
+            connTailscale.style.color = 'var(--accent)';
+          } else {
+            connTailscale.textContent = 'Установлен, но выключен. Включите Tailscale на ПК и телефоне — трекпад будет работать из любой сети, даже при включённом VPN.';
+            connTailscale.style.color = '';
+          }
+        } else {
+          connTailscaleRow.style.display = 'none';
+        }
+      } catch (e) {
+        connUrlsHint.textContent = 'Не удалось получить список адресов с ПК.';
+        connUrls.innerHTML = '';
+      }
+    }
+
+    function openConnModal() {
+      settingsModal.classList.remove('visible');
+      connModal.scrollTop = 0;
+      connModal.classList.add('visible');
+      loadNetworkInfo();
+      renderLatency();
+      haptic.ui();
+    }
+
+    function closeConnModal() {
+      connModal.classList.remove('visible');
+    }
+
+    function reconnectWS() {
+      connStatus.textContent = 'Подключение…';
+      connStatus.style.color = 'var(--text-sub)';
+      clearConnBannerTimer();
+      try {
+        if (ws) {
+          ws.onclose = null;
+          ws.close();
+        }
+      } catch (e) {}
+      wsConnected = false;
+      connectWS();
+      setTimeout(loadNetworkInfo, 1200);
+    }
+
+    function connectWS() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}/ws`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        wsConnected = true;
+        statusDot.classList.add('connected');
+        clearConnBannerTimer();
+        showConnBanner(false);
+        updateConnStatus();
+        startRttProbe();
+        // In landscape the app panel is always on screen, so fill it at once.
+        if (isDockedAppsPanel()) send({ type: 'get_windows' });
+        requestMediaState();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'windows_list') {
+            renderAppsList(data.windows, data.pinned);
+          } else if (data.type === 'launch_result') {
+            onLaunchResult(data);
+          } else if (data.type === 'pong') {
+            onPong(data.id);
+          } else if (data.type === 'window_action') {
+            onWindowAction(data);
+          } else if (data.type === 'media_state') {
+            applyMediaState(data.state);
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        wsConnected = false;
+        statusDot.classList.remove('connected');
+        stopRttProbe();
+        scheduleConnBanner();
+        updateConnStatus();
+        setTimeout(connectWS, 1500);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    // --- Input pipeline -----------------------------------------------------
+    // Touch events fire at 120–240 Hz on modern phones while the cursor only
+    // needs ~60 updates per second. Coalescing all movement into one message
+    // per animation frame halves WebSocket traffic and removes the bursty
+    // stalls that look like cursor jitter, especially over a VPN.
+    let pendingMoveX = 0;
+    let pendingMoveY = 0;
+    let pendingScrollX = 0;
+    let pendingScrollY = 0;
+    let inputFrame = null;
+
+    // If the socket is backed up, drop stale motion instead of queueing it:
+    // replaying old deltas later is what makes the pointer jump.
+    const MAX_BUFFERED_BYTES = 32 * 1024;
+
+    // True while a finger is on the glass. Used to keep background traffic
+    // (window list, media polling) out of the middle of a gesture.
+    let gestureActive = false;
+
+    function rawSend(data) {
+      if (!ws || !wsConnected || ws.readyState !== WebSocket.OPEN) return false;
+      if (ws.bufferedAmount > MAX_BUFFERED_BYTES) return false;
+      ws.send(JSON.stringify(data));
+      return true;
+    }
+
+    function flushInput() {
+      if (inputFrame !== null) {
+        cancelAnimationFrame(inputFrame);
+        inputFrame = null;
+      }
+
+      const moveX = pendingMoveX;
+      const moveY = pendingMoveY;
+      const scrollX = pendingScrollX;
+      const scrollY = pendingScrollY;
+      pendingMoveX = 0;
+      pendingMoveY = 0;
+      pendingScrollX = 0;
+      pendingScrollY = 0;
+
+      if (moveX !== 0 || moveY !== 0) {
+        rawSend({ type: 'move', dx: moveX, dy: moveY });
+      }
+      if (scrollX !== 0 || scrollY !== 0) {
+        rawSend({ type: 'scroll', dx: scrollX, dy: scrollY });
+      }
+    }
+
+    function scheduleInputFlush() {
+      if (inputFrame !== null) return;
+      inputFrame = requestAnimationFrame(flushInput);
+    }
+
+    function queueMove(dx, dy) {
+      pendingMoveX += dx;
+      pendingMoveY += dy;
+      scheduleInputFlush();
+    }
+
+    function queueScroll(dx, dy) {
+      pendingScrollX += dx;
+      pendingScrollY += dy;
+      scheduleInputFlush();
+    }
+
+    function send(data) {
+      // Discrete commands (clicks, keys, gestures) must never overtake
+      // movement that is still waiting for the next frame.
+      flushInput();
+      rawSend(data);
+    }
+
+    connBanner.addEventListener('click', openConnModal);
+    btnCloseConn.addEventListener('click', closeConnModal);
+    btnReconnect.addEventListener('click', reconnectWS);
+    rowConnection.addEventListener('click', openConnModal);
+
+    window.addEventListener('offline', () => {
+      wsConnected = false;
+      showConnBanner(true);
+      updateConnStatus();
+    });
+
+    // --- Screen wake lock ---------------------------------------------------
+    // Android drops into Wi-Fi power saving soon after the screen dims, and
+    // the first touch after that arrives 100–300 ms late — it feels like the
+    // trackpad "woke up". Holding the screen on while the pad is in use keeps
+    // the radio in its fast mode. The lock is released after 45 s without
+    // touches, so the phone can still lock itself normally.
+    let wakeLock = null;
+    let wakeLockIdleTimer = null;
+
+    async function acquireWakeLock() {
+      if (wakeLock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) {
+        wakeLock = null;
+      }
+    }
+
+    function releaseWakeLock() {
+      if (!wakeLock) return;
+      try { wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+    }
+
+    function keepAwake() {
+      acquireWakeLock();
+      if (wakeLockIdleTimer !== null) clearTimeout(wakeLockIdleTimer);
+      wakeLockIdleTimer = setTimeout(releaseWakeLock, 45000);
+    }
+
+    trackpad.addEventListener('touchstart', keepAwake, { passive: true });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') {
+        if (wakeLockIdleTimer !== null) {
+          clearTimeout(wakeLockIdleTimer);
+          wakeLockIdleTimer = null;
+        }
+        releaseWakeLock();
+      }
+    });
+
+    connectWS();
+
+    // Multi-touch Gestures State
+    let touchPoints = {};
+    let touchStartTime = 0;
+    let touchMovedDist = 0;
+    let initialTouchCount = 0;
+
+    // Tap tracking
+    let lastTapTime1F = 0;
+    let lastTapPos1F = { x: 0, y: 0 };
+    let lastTapTime2F = 0;
+
+    // 1-finger double tap drag state
+    let isDoubleTapDragging = false;
+
+    // 3-finger drag state
+    let isThreeFingerDragging = false;
+
+    // 2-finger gesture state (scroll, pinch, rotate, swipe)
+    // 'undecided' -> 'scroll' | 'pinch' | 'gesture'
+    let twoFingerMode = 'undecided';
+    let twoFingerStartDist = 0;
+    let twoFingerStartAngle = 0;
+    let twoFingerStartMid = { x: 0, y: 0 };
+    let prevTwoMid = { x: 0, y: 0 };
+    let prevPinchDist = 0;
+    let hasTwoFingerAction = false;
+    let isRightEdgeSwipe = false;
+    let scrollDetentAcc = 0;
+
+    // 4-finger gesture state
+    let fourFingerStartDist = 0;
+    let fourFingerStartMid = { x: 0, y: 0 };
+    let fourFingerActionTriggered = false;
+
+    function getTouchesCentroid(touches) {
+      let sx = 0, sy = 0;
+      for (let i = 0; i < touches.length; i++) {
+        sx += touches[i].clientX;
+        sy += touches[i].clientY;
+      }
+      return { x: sx / touches.length, y: sy / touches.length };
+    }
+
+    function getTouchesSpread(touches, centroid) {
+      let totalDist = 0;
+      for (let i = 0; i < touches.length; i++) {
+        totalDist += Math.hypot(touches[i].clientX - centroid.x, touches[i].clientY - centroid.y);
+      }
+      return totalDist / touches.length;
+    }
+
+    trackpad.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const now = performance.now();
+      const count = e.touches.length;
+      gestureActive = true;
+      initialTouchCount = count;
+      touchStartTime = now;
+      touchMovedDist = 0;
+
+      const rect = trackpad.getBoundingClientRect();
+
+      if (count === 1) {
+        const t = e.touches[0];
+        touchPoints[t.identifier] = { x: t.clientX, y: t.clientY, time: now };
+
+        glow1.style.left = (t.clientX - rect.left) + 'px';
+        glow1.style.top = (t.clientY - rect.top) + 'px';
+        glow1.classList.add('active');
+
+        // Check for double-tap-to-drag (1 finger)
+        const timeSince = now - lastTapTime1F;
+        const distSince = Math.hypot(t.clientX - lastTapPos1F.x, t.clientY - lastTapPos1F.y);
+        if (timeSince < 300 && distSince < 35) {
+          isDoubleTapDragging = true;
+          trackpad.classList.add('dragging');
+          send({ type: 'down', btn: 'left' });
+          haptic.latch();
+        }
+      } else if (count === 2) {
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        twoFingerStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        prevPinchDist = twoFingerStartDist;
+        twoFingerStartAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+
+        const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+        twoFingerStartMid = mid;
+        prevTwoMid = mid;
+        twoFingerMode = 'undecided';
+        hasTwoFingerAction = false;
+        scrollDetentAcc = 0;
+
+        // Check if starting from right edge (Notification Center gesture)
+        const rightThreshold = rect.right - (rect.width * 0.16);
+        isRightEdgeSwipe = (t1.clientX > rightThreshold || t2.clientX > rightThreshold);
+
+        glow2.style.left = (t2.clientX - rect.left) + 'px';
+        glow2.style.top = (t2.clientY - rect.top) + 'px';
+        glow2.classList.add('active');
+      } else if (count === 3) {
+        // Prepare 3-finger drag
+        const centroid = getTouchesCentroid(e.touches);
+        touchPoints['three_prev'] = centroid;
+        hasTwoFingerAction = false;
+      } else if (count === 4) {
+        const centroid = getTouchesCentroid(e.touches);
+        fourFingerStartMid = centroid;
+        fourFingerStartDist = getTouchesSpread(e.touches, centroid);
+        fourFingerActionTriggered = false;
+      }
+    }, { passive: false });
+
+    trackpad.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const now = performance.now();
+      const count = e.touches.length;
+      const rect = trackpad.getBoundingClientRect();
+
+      if (count === 1) {
+        // Only a gesture that began with one finger may move the cursor.
+        if (initialTouchCount !== 1) return;
+
+        const t = e.touches[0];
+        glow1.style.left = (t.clientX - rect.left) + 'px';
+        glow1.style.top = (t.clientY - rect.top) + 'px';
+
+        const prev = touchPoints[t.identifier];
+        if (!prev) {
+          touchPoints[t.identifier] = { x: t.clientX, y: t.clientY, time: now };
+          return;
+        }
+
+        const rawDx = t.clientX - prev.x;
+        const rawDy = t.clientY - prev.y;
+        const dist = Math.hypot(rawDx, rawDy);
+        touchMovedDist += dist;
+
+        const dt = Math.max(now - prev.time, 1);
+        const speed = dist / dt;
+
+        let accelFactor = 1.0;
+        if (speed > 0.15) {
+          accelFactor = Math.min(Math.pow(speed * 3.5, config.acceleration - 1), 3.8);
+        }
+
+        const moveDx = rawDx * config.sensitivity * accelFactor;
+        const moveDy = rawDy * config.sensitivity * accelFactor;
+
+        queueMove(moveDx, moveDy);
+        touchPoints[t.identifier] = { x: t.clientX, y: t.clientY, time: now };
+      } else if (count === 2) {
+        // Ignore a leftover finger from a 3/4-finger gesture.
+        if (initialTouchCount !== 2) return;
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        glow1.style.left = (t1.clientX - rect.left) + 'px';
+        glow1.style.top = (t1.clientY - rect.top) + 'px';
+        glow2.style.left = (t2.clientX - rect.left) + 'px';
+        glow2.style.top = (t2.clientY - rect.top) + 'px';
+
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const currentAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+        const currentMid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+
+        const deltaMidX = currentMid.x - prevTwoMid.x;
+        const deltaMidY = currentMid.y - prevTwoMid.y;
+        const totalMidX = currentMid.x - twoFingerStartMid.x;
+        const totalMidY = currentMid.y - twoFingerStartMid.y;
+        const totalDist = Math.hypot(totalMidX, totalMidY);
+
+        let angleDiff = currentAngle - twoFingerStartAngle;
+        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+        const distDiff = currentDist - twoFingerStartDist;
+
+        // Pinch mode: keep forwarding distance changes until fingers lift.
+        if (twoFingerMode === 'pinch') {
+          const pinchDelta = currentDist - prevPinchDist;
+          if (Math.abs(pinchDelta) >= 0.5) {
+            send({ type: 'zoom', delta: pinchDelta * 1.5 });
+            if (Math.abs(pinchDelta) > 10) haptic.tick();
+          }
+          prevPinchDist = currentDist;
+          prevTwoMid = currentMid;
+          return;
+        }
+
+        // A system gesture or page swipe already fired: ignore the rest.
+        if (twoFingerMode === 'gesture') {
+          prevTwoMid = currentMid;
+          return;
+        }
+
+        if (twoFingerMode === 'undecided') {
+          // 1. Edge swipe -> Notification Center.
+          if (isRightEdgeSwipe && totalMidX < -50 && Math.abs(totalMidY) < 35) {
+            twoFingerMode = 'gesture';
+            hasTwoFingerAction = true;
+            send({ type: 'action', action: 'notification_center' });
+            showHUD('Центр уведомлений');
+            haptic.edgeSnap();
+            return;
+          }
+
+          // 2. Horizontal page swipe (Alt+Left / Alt+Right). Checked before
+          // scrolling so the first pixels don't turn into a harmless HWHEEL.
+          if (Math.abs(totalMidX) > 70 && Math.abs(totalMidY) < 40) {
+            twoFingerMode = 'gesture';
+            hasTwoFingerAction = true;
+            if (totalMidX < 0) {
+              send({ type: 'action', action: 'page_forward' });
+              showHUD('Вперёд ➔');
+            } else {
+              send({ type: 'action', action: 'page_back' });
+              showHUD('⬅ Назад');
+            }
+            haptic.click();
+            return;
+          }
+
+          // 3. Rotation: only when the finger distance stays stable,
+          // otherwise a pinch with a bit of wrist rotation is more likely.
+          if (Math.abs(angleDiff) > 0.7 && Math.abs(distDiff) < 30) {
+            twoFingerMode = 'gesture';
+            hasTwoFingerAction = true;
+            send({ type: 'action', action: angleDiff > 0 ? 'rotate_cw' : 'rotate_ccw' });
+            showHUD(angleDiff > 0 ? 'Поворот ↷' : 'Поворот ↶');
+            haptic.tick();
+            return;
+          }
+
+          // 4. Pinch-to-zoom.
+          if (Math.abs(distDiff) > 35) {
+            twoFingerMode = 'pinch';
+            hasTwoFingerAction = true;
+            const pinchDelta = currentDist - prevPinchDist;
+            send({ type: 'zoom', delta: pinchDelta * 1.5 });
+            if (Math.abs(pinchDelta) > 10) haptic.tick();
+            prevPinchDist = currentDist;
+            prevTwoMid = currentMid;
+            return;
+          }
+
+          // 5. Not enough movement yet.
+          if (totalDist < 10) {
+            return;
+          }
+
+          // Keep waiting while the movement is clearly horizontal: it may
+          // still become a page swipe.
+          if (Math.abs(totalMidX) > Math.abs(totalMidY) * 1.2) {
+            prevTwoMid = currentMid;
+            return;
+          }
+
+          twoFingerMode = 'scroll';
+          hasTwoFingerAction = true;
+        }
+
+        // --- Two-finger scroll. ---
+        if (twoFingerMode === 'scroll') {
+          const scrollFactor = 0.02 * config.scrollSpeed;
+          const dy = (config.naturalScroll ? deltaMidY : -deltaMidY) * scrollFactor;
+          const dx = deltaMidX * scrollFactor;
+
+          queueScroll(dx, dy);
+
+          // Pixel 9 Haptic Wheel Detents (ultra-crisp tick every ~32px of travel)
+          if (config.scrollHaptics) {
+            scrollDetentAcc += Math.abs(deltaMidY);
+            if (scrollDetentAcc >= 32) {
+              scrollDetentAcc = 0;
+              haptic.tick();
+            }
+          }
+
+          prevTwoMid = currentMid;
+        }
+      } else if (count === 3) {
+        // Ignore leftover fingers from a 4-finger gesture.
+        if (initialTouchCount !== 3) return;
+
+        // 3-finger Drag
+        const centroid = getTouchesCentroid(e.touches);
+        const prev = touchPoints['three_prev'] || centroid;
+        const dx = centroid.x - prev.x;
+        const dy = centroid.y - prev.y;
+        touchMovedDist += Math.hypot(dx, dy);
+
+        if (touchMovedDist > 10) {
+          if (!isThreeFingerDragging) {
+            isThreeFingerDragging = true;
+            trackpad.classList.add('dragging');
+            send({ type: 'down', btn: 'left' });
+            showHUD('Перетаскивание 3 пальцами');
+            haptic.latch();
+          }
+
+          const moveDx = dx * config.sensitivity * 1.3;
+          const moveDy = dy * config.sensitivity * 1.3;
+          queueMove(moveDx, moveDy);
+        }
+        touchPoints['three_prev'] = centroid;
+      } else if (count === 4 && !fourFingerActionTriggered) {
+        // Only a gesture that began with four fingers uses 4-finger actions.
+        if (initialTouchCount !== 4) return;
+
+        const centroid = getTouchesCentroid(e.touches);
+        const spread = getTouchesSpread(e.touches, centroid);
+        const totalDx = centroid.x - fourFingerStartMid.x;
+        const totalDy = centroid.y - fourFingerStartMid.y;
+        const spreadDiff = spread - fourFingerStartDist;
+
+        // 1. Spread Apart (Show Desktop)
+        if (spreadDiff > 35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'show_desktop' });
+          showHUD('Рабочий стол');
+          haptic.gesture();
+        }
+        // 2. Pinch Together (Applications / Launchpad)
+        else if (spreadDiff < -35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'launchpad' });
+          showHUD('Приложения (Пуск)');
+          haptic.gesture();
+        }
+        // 3. Swipe Up (Mission Control)
+        else if (totalDy < -45 && Math.abs(totalDx) < 35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'mission_control' });
+          showHUD('Mission Control');
+          haptic.gesture();
+        }
+        // 4. Swipe Down (Exposé)
+        else if (totalDy > 45 && Math.abs(totalDx) < 35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'expose' });
+          showHUD('Exposé (Окна)');
+          haptic.gesture();
+        }
+        // 5. Swipe Right (Switch Desktop Left)
+        else if (totalDx > 50 && Math.abs(totalDy) < 35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'desktop_left' });
+          showHUD('⮜ Рабочий стол');
+          haptic.gesture();
+        }
+        // 6. Swipe Left (Switch Desktop Right)
+        else if (totalDx < -50 && Math.abs(totalDy) < 35) {
+          fourFingerActionTriggered = true;
+          send({ type: 'action', action: 'desktop_right' });
+          showHUD('Рабочий стол ⮞');
+          haptic.gesture();
+        }
+      }
+    }, { passive: false });
+
+    trackpad.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const now = performance.now();
+      const remaining = e.touches.length;
+
+      if (remaining === 0) {
+        gestureActive = false;
+        glow1.classList.remove('active');
+        glow2.classList.remove('active');
+
+        // End 1-finger double-tap drag
+        if (isDoubleTapDragging) {
+          isDoubleTapDragging = false;
+          trackpad.classList.remove('dragging');
+          send({ type: 'up', btn: 'left' });
+          haptic.release();
+        }
+        // End 3-finger drag
+        else if (isThreeFingerDragging) {
+          isThreeFingerDragging = false;
+          trackpad.classList.remove('dragging');
+          send({ type: 'up', btn: 'left' });
+          haptic.release();
+        }
+        // 1-finger tap check
+        else if (initialTouchCount === 1) {
+          const duration = now - touchStartTime;
+          if (touchMovedDist < 12 && duration < 240) {
+            send({ type: 'click', btn: 'left' });
+            haptic.click();
+
+            const changed = e.changedTouches[0];
+            if (changed) {
+              lastTapTime1F = now;
+              lastTapPos1F = { x: changed.clientX, y: changed.clientY };
+            }
+          }
+        }
+        // 3-finger tap check (Look up & Search: Win + S)
+        else if (initialTouchCount === 3 && touchMovedDist < 15) {
+          const duration = now - touchStartTime;
+          if (duration < 280) {
+            send({ type: 'action', action: 'search' });
+            showHUD('Поиск');
+            haptic.click();
+          }
+        }
+      } else if (remaining === 1) {
+        glow2.classList.remove('active');
+
+        // 2-finger taps (Secondary click or Smart Zoom)
+        if (initialTouchCount === 2 && twoFingerMode === 'undecided' && !hasTwoFingerAction) {
+          const duration = now - touchStartTime;
+          if (duration < 280) {
+            const timeSince2F = now - lastTapTime2F;
+            if (timeSince2F < 350) {
+              // Double tap with 2 fingers -> Smart Zoom!
+              send({ type: 'action', action: 'smart_zoom' });
+              showHUD('Смарт-масштабирование');
+              haptic.gesture();
+              lastTapTime2F = 0;
+            } else {
+              // Single 2-finger tap -> Right Click!
+              send({ type: 'click', btn: 'right' });
+              haptic.secondary();
+              lastTapTime2F = now;
+            }
+            hasTwoFingerAction = true;
+          }
+        }
+      }
+
+      touchPoints = {};
+      for (let i = 0; i < e.touches.length; i++) {
+        const t = e.touches[i];
+        touchPoints[t.identifier] = { x: t.clientX, y: t.clientY, time: now };
+      }
+
+      if (remaining === 0) {
+        twoFingerMode = 'undecided';
+        hasTwoFingerAction = false;
+      }
+    }, { passive: false });
+
+    trackpad.addEventListener('touchcancel', () => {
+      gestureActive = false;
+      glow1.classList.remove('active');
+      glow2.classList.remove('active');
+      if (isDoubleTapDragging || isThreeFingerDragging) {
+        isDoubleTapDragging = false;
+        isThreeFingerDragging = false;
+        trackpad.classList.remove('dragging');
+        send({ type: 'up', btn: 'left' });
+        haptic.release();
+      }
+      twoFingerMode = 'undecided';
+      hasTwoFingerAction = false;
+      touchPoints = {};
+    });
+
+    // Physical Buttons
+    btnLeftClick.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      send({ type: 'down', btn: 'left' });
+      haptic.click();
+      btnLeftClick.classList.add('active');
+    });
+    btnLeftClick.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      send({ type: 'up', btn: 'left' });
+      btnLeftClick.classList.remove('active');
+    });
+    btnLeftClick.addEventListener('touchcancel', () => {
+      send({ type: 'up', btn: 'left' });
+      btnLeftClick.classList.remove('active');
+    });
+
+    btnRightClick.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      send({ type: 'down', btn: 'right' });
+      haptic.secondary();
+      btnRightClick.classList.add('active');
+    });
+    btnRightClick.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      send({ type: 'up', btn: 'right' });
+      btnRightClick.classList.remove('active');
+    });
+    btnRightClick.addEventListener('touchcancel', () => {
+      send({ type: 'up', btn: 'right' });
+      btnRightClick.classList.remove('active');
+    });
+
+    // Guide Modal
+    btnGuide.addEventListener('click', () => {
+      guideModal.scrollTop = 0;
+      guideModal.classList.add('visible');
+      haptic.ui();
+    });
+    btnCloseGuide.addEventListener('click', () => {
+      guideModal.classList.remove('visible');
+      haptic.ui();
+    });
+
+    // Shortcuts Toggle
+    btnShortcuts.addEventListener('click', () => {
+      shortcutsBar.classList.toggle('visible');
+      btnShortcuts.classList.toggle('active');
+      haptic.ui();
+    });
+
+    document.querySelectorAll('.shortcut-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const action = chip.getAttribute('data-action');
+        send({ type: 'action', action: action });
+        haptic.click();
+      });
+    });
+
+    // Native Mobile Keyboard Focus
+    btnKeyboard.addEventListener('click', () => {
+      hiddenInput.focus();
+      haptic.ui();
+    });
+
+    // Native mobile keyboard: forward committed text, Backspace/Delete and Enter.
+    let isComposingText = false;
+
+    function flushTypedText() {
+      const text = hiddenInput.value;
+      hiddenInput.value = '';
+      if (text) send({ type: 'type', text });
+    }
+
+    hiddenInput.addEventListener('compositionstart', () => {
+      isComposingText = true;
+    });
+
+    hiddenInput.addEventListener('compositionend', () => {
+      isComposingText = false;
+      flushTypedText();
+    });
+
+    hiddenInput.addEventListener('input', (e) => {
+      // While the IME is composing, keep the value in the field.
+      if (isComposingText || e.isComposing) return;
+
+      if (e.inputType === 'deleteContentBackward') {
+        hiddenInput.value = '';
+        send({ type: 'action', action: 'backspace' });
+        return;
+      }
+      if (e.inputType === 'deleteContentForward') {
+        hiddenInput.value = '';
+        send({ type: 'action', action: 'delete' });
+        return;
+      }
+
+      flushTypedText();
+    });
+
+    hiddenInput.addEventListener('keydown', (e) => {
+      // Backspace on an empty field doesn't produce an input event, so handle
+      // it here. When the field has text, the input handler does it instead
+      // (avoids sending Backspace twice).
+      if (e.key === 'Backspace' && hiddenInput.value === '') {
+        e.preventDefault();
+        send({ type: 'action', action: 'backspace' });
+      } else if (e.key === 'Delete' && hiddenInput.value === '') {
+        e.preventDefault();
+        send({ type: 'action', action: 'delete' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        send({ type: 'action', action: 'enter' });
+      }
+    });
+
+    // Fullscreen Toggle
+    // Edge-to-edge layout on a phone: in fullscreen the page is drawn under the
+    // camera cutout. Tag the document with which edge the cutout is on so the
+    // island and the app dock get real clearance (Pixel 9: top in portrait,
+    // left or right in landscape depending on the rotation direction).
+    const IS_TOUCH_DEVICE =
+      (navigator.maxTouchPoints || 0) > 0 ||
+      ('ontouchstart' in window) ||
+      window.matchMedia('(pointer: coarse)').matches;
+
+    function syncEdgeToEdgeLayout() {
+      const edgeToEdge = Boolean(document.fullscreenElement) && IS_TOUCH_DEVICE;
+      document.documentElement.classList.toggle('edge-to-edge', edgeToEdge);
+      if (!edgeToEdge) {
+        delete document.documentElement.dataset.cutout;
+        return;
+      }
+      if (!window.matchMedia('(orientation: landscape)').matches) {
+        document.documentElement.dataset.cutout = 'top';
+        return;
+      }
+      const angle = (screen.orientation && screen.orientation.angle) || 0;
+      document.documentElement.dataset.cutout = angle === 270 ? 'right' : 'left';
+    }
+
+    document.addEventListener('fullscreenchange', syncEdgeToEdgeLayout);
+    window.addEventListener('orientationchange', () => setTimeout(syncEdgeToEdgeLayout, 180));
+    syncEdgeToEdgeLayout();
+
+    btnFullscreen.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+      haptic.ui();
+    });
+
+    // Settings Modal
+    btnSettings.addEventListener('click', () => {
+      settingsModal.scrollTop = 0;
+      settingsModal.classList.add('visible');
+      haptic.ui();
+    });
+
+    btnCloseSettings.addEventListener('click', () => {
+      settingsModal.classList.remove('visible');
+      haptic.ui();
+    });
+
+    sliderSens.addEventListener('input', (e) => {
+      config.sensitivity = parseFloat(e.target.value);
+      valSens.textContent = config.sensitivity.toFixed(1) + 'x';
+      localStorage.setItem('apple_sens', config.sensitivity);
+    });
+
+    sliderAccel.addEventListener('input', (e) => {
+      config.acceleration = parseFloat(e.target.value);
+      valAccel.textContent = config.acceleration.toFixed(1) + 'x';
+      localStorage.setItem('apple_accel', config.acceleration);
+    });
+
+    sliderScroll.addEventListener('input', (e) => {
+      config.scrollSpeed = parseFloat(e.target.value);
+      valScroll.textContent = config.scrollSpeed.toFixed(1) + 'x';
+      localStorage.setItem('apple_scroll', config.scrollSpeed);
+    });
+
+    switchNatural.addEventListener('change', (e) => {
+      config.naturalScroll = e.target.checked;
+      localStorage.setItem('apple_natural', config.naturalScroll);
+      haptic.ui();
+    });
+
+    switchVibrate.addEventListener('change', (e) => {
+      config.vibrate = e.target.checked;
+      localStorage.setItem('apple_vibrate', config.vibrate);
+      haptic.ui();
+    });
+
+    sliderHapticProfile.addEventListener('input', (e) => {
+      config.hapticProfile = parseInt(e.target.value, 10);
+      valHapticProfile.textContent = HAPTIC_PROFILE_NAMES[config.hapticProfile] || "Pixel 9 (Ультра-чёткий)";
+      localStorage.setItem('pixel_haptic_profile', config.hapticProfile);
+      haptic.click();
+    });
+
+    switchScrollHaptics.addEventListener('change', (e) => {
+      config.scrollHaptics = e.target.checked;
+      localStorage.setItem('pixel_scroll_haptics', config.scrollHaptics);
+      haptic.tick();
+    });
+
+    switchButtons.addEventListener('change', (e) => {
+      config.showButtons = e.target.checked;
+      buttonsBar.style.display = config.showButtons ? 'flex' : 'none';
+      localStorage.setItem('apple_buttons', config.showButtons);
+      haptic.ui();
+    });
+
+    switchLightTheme.addEventListener('change', (e) => {
+      applyTheme(e.target.checked);
+      haptic.ui();
+    });
+
+    // Left Apps Dock Logic
+    const btnAppsDock = document.getElementById('btn-apps-dock');
+    const appsSidebar = document.getElementById('apps-sidebar');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    const appsList = document.getElementById('apps-list');
+
+    let appsRefreshTimer = null;
+    let activeHwnd = null;
+
+    // The dock is the same height as the trackpad and starts at its top edge,
+    // so both surfaces line up even when the header or buttons change size.
+    let dockGeometryFrame = null;
+
+    function updateDockGeometry() {
+      if (dockGeometryFrame !== null) return;
+      dockGeometryFrame = requestAnimationFrame(() => {
+        dockGeometryFrame = null;
+        const rect = trackpad.getBoundingClientRect();
+        if (rect.height < 60) return;
+        appsSidebar.style.top = Math.round(rect.top) + 'px';
+        appsSidebar.style.bottom = Math.max(0, Math.round(window.innerHeight - rect.bottom)) + 'px';
+      });
+    }
+
+    window.addEventListener('resize', updateDockGeometry);
+    window.addEventListener('orientationchange', () => setTimeout(updateDockGeometry, 150));
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(updateDockGeometry).observe(trackpad);
+    }
+    updateDockGeometry();
+
+    function setActiveApp(hwnd) {
+      activeHwnd = hwnd ? Number(hwnd) : null;
+      appsList.querySelectorAll('.app-item').forEach(el => {
+        el.classList.toggle('active', Number(el.dataset.hwnd) === activeHwnd);
+      });
+    }
+
+    function onWindowAction(data) {
+      const hwnd = Number(data.hwnd) || 0;
+      const title = (data.title || '').substring(0, 18);
+
+      if (data.action === 'minimized') {
+        setActiveApp(null);
+        showHUD(title ? `Свёрнуто: ${title}` : 'Свёрнуто');
+      } else if (data.action === 'focused') {
+        setActiveApp(hwnd);
+        showHUD(title ? `Открыто: ${title}` : 'Открыто');
+      }
+
+      // Confirm the state once Windows has finished switching windows.
+      setTimeout(() => {
+        if (wsConnected) send({ type: 'get_windows' });
+      }, 280);
+    }
+
+    function startAppsRefresh() {
+      stopAppsRefresh();
+      // Keep the list in sync with the PC while the panel is open. The reply is
+      // ~17 KB, so skip it while a finger is on the glass: it would compete with
+      // the cursor messages and show up as a stutter.
+      appsRefreshTimer = setInterval(() => {
+        if (gestureActive || trackpad.classList.contains('dragging')) return;
+        send({ type: 'get_windows' });
+      }, 4000);
+    }
+
+    function stopAppsRefresh() {
+      if (appsRefreshTimer) {
+        clearInterval(appsRefreshTimer);
+        appsRefreshTimer = null;
+      }
+    }
+
+    // Landscape on a phone: the panel is docked to the left permanently and
+    // must be kept up to date even though the user never opens it manually.
+    const landscapeAppsQuery = window.matchMedia('(orientation: landscape) and (min-width: 600px)');
+
+    function isDockedAppsPanel() {
+      return landscapeAppsQuery.matches;
+    }
+
+    function syncAppsPanel() {
+      if (!isDockedAppsPanel()) {
+        if (!appsSidebar.classList.contains('visible')) stopAppsRefresh();
+        return;
+      }
+
+      appsSidebar.classList.remove('visible');
+      sidebarBackdrop.classList.remove('visible');
+      btnAppsDock.classList.remove('active');
+      send({ type: 'get_windows' });
+      startAppsRefresh();
+    }
+
+    function toggleAppsSidebar(open) {
+      const isOpen = open !== undefined ? open : !appsSidebar.classList.contains('visible');
+      if (isOpen) {
+        appsSidebar.classList.add('visible');
+        sidebarBackdrop.classList.add('visible');
+        btnAppsDock.classList.add('active');
+        send({ type: 'get_windows' });
+        startAppsRefresh();
+      } else {
+        appsSidebar.classList.remove('visible');
+        sidebarBackdrop.classList.remove('visible');
+        btnAppsDock.classList.remove('active');
+        if (!isDockedAppsPanel()) stopAppsRefresh();
+      }
+      haptic.ui();
+    }
+
+    btnAppsDock.addEventListener('click', () => toggleAppsSidebar());
+    sidebarBackdrop.addEventListener('click', () => toggleAppsSidebar(false));
+
+    if (typeof landscapeAppsQuery.addEventListener === 'function') {
+      landscapeAppsQuery.addEventListener('change', syncAppsPanel);
+    } else if (typeof landscapeAppsQuery.addListener === 'function') {
+      landscapeAppsQuery.addListener(syncAppsPanel);
+    }
+    syncAppsPanel();
+
+    function makeLetterBadge(title) {
+      const badge = document.createElement('div');
+      badge.className = 'app-icon-badge';
+      badge.textContent = (title.trim().charAt(0) || '?').toUpperCase();
+      return badge;
+    }
+
+    // Last list we painted. The PC pushes the same state every few seconds;
+    // re-painting identical content would make every icon flicker, so the
+    // dock is only rebuilt when something actually changed.
+    let appsSignature = '';
+    let pinnedApps = [];
+    let pendingLaunchId = '';
+    let pendingLaunchTimer = null;
+
+    function appsStateSignature(windows, pinnedOnly) {
+      return JSON.stringify([
+        windows.map(win => [win.hwnd, win.title, win.exe || '', win.icon_id || '']),
+        pinnedOnly.map(app => [app.id, app.name, app.exe || '', app.icon_id || ''])
+      ]);
+    }
+
+    function makeAppItem(options) {
+      const item = document.createElement('div');
+      item.className = 'app-item';
+      if (options.running) item.classList.add('running');
+      if (options.active) item.classList.add('active');
+      if (options.pinnedId) item.classList.add('pinned');
+      if (options.launching) item.classList.add('launching');
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-label', options.label);
+      item.title = options.label;
+
+      if (options.iconId) {
+        const img = document.createElement('img');
+        img.className = 'app-icon';
+        // 256 px PNG served once and cached by the browser for a year.
+        img.src = '/api/icon/' + options.iconId;
+        img.alt = '';
+        img.draggable = false;
+        img.decoding = 'async';
+        img.addEventListener('error', () => img.replaceWith(makeLetterBadge(options.label)), { once: true });
+        item.appendChild(img);
+      } else {
+        item.appendChild(makeLetterBadge(options.label));
+      }
+
+      item.addEventListener('click', () => {
+        flushInput();
+        if (options.pinnedId) {
+          // A taskbar pin that is not running: launch it on the PC.
+          haptic.click();
+          pendingLaunchId = options.pinnedId;
+          item.classList.add('launching');
+          showHUD('Запуск: ' + options.label);
+          send({ type: 'launch_app', id: options.pinnedId, name: options.label });
+          clearTimeout(pendingLaunchTimer);
+          pendingLaunchTimer = setTimeout(() => { pendingLaunchId = ''; }, 8000);
+          toggleAppsSidebar(false);
+          // Windows starts the process asynchronously; refresh the dock a
+          // couple of times so the new window (and its dot) appears.
+          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 700);
+          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 1900);
+          setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 3600);
+          return;
+        }
+        haptic.click();
+        // The server focuses the window, or minimizes it when it is already
+        // in front (second tap on the same icon).
+        send({ type: 'focus_window', hwnd: options.hwnd, title: options.windowTitle });
+        toggleAppsSidebar(false);
+      });
+
+      return item;
+    }
+
+    function renderAppsList(windows, pinned) {
+      const list = Array.isArray(windows) ? windows : [];
+      pinnedApps = Array.isArray(pinned) ? pinned : [];
+
+      // Running apps own their icon; a pinned entry for the same application
+      // is dropped so the dock never shows the same icon twice.
+      const runningExes = new Set();
+      const runningIcons = new Set();
+      list.forEach(win => {
+        const exe = (win.exe || '').toLowerCase();
+        if (exe) runningExes.add(exe);
+        if (win.icon_id) runningIcons.add(win.icon_id);
+      });
+
+      const seenPinned = new Set();
+      const pinnedOnly = [];
+      pinnedApps.forEach(app => {
+        if (!app || !app.id || seenPinned.has(app.id)) return;
+        seenPinned.add(app.id);
+        const exe = (app.exe || '').toLowerCase();
+        if (exe && runningExes.has(exe)) return;
+        if (app.icon_id && runningIcons.has(app.icon_id)) return;
+        pinnedOnly.push(app);
+      });
+
+      const signature = appsStateSignature(list, pinnedOnly);
+      const focused = list.find(win => win.focused);
+      const activeId = focused ? Number(focused.hwnd) : null;
+
+      if (signature === appsSignature) {
+        // Same content: only the highlight can have changed.
+        setActiveApp(activeId);
+        return;
+      }
+      appsSignature = signature;
+
+      appsList.innerHTML = '';
+
+      if (list.length === 0 && pinnedOnly.length === 0) {
+        activeHwnd = null;
+        const empty = document.createElement('div');
+        empty.className = 'apps-empty';
+        empty.title = 'Нет приложений';
+        empty.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+          '<rect x="3" y="5" width="18" height="14" rx="2.5"></rect>' +
+          '<path d="M3 9h18"></path>' +
+          '</svg>';
+        appsList.appendChild(empty);
+        return;
+      }
+
+      activeHwnd = activeId;
+      let index = 0;
+
+      list.forEach(win => {
+        const title = win.title || 'Приложение';
+        const item = makeAppItem({
+          label: title,
+          windowTitle: title,
+          iconId: win.icon_id,
+          running: true,
+          active: Number(win.hwnd) === activeId,
+          hwnd: win.hwnd,
+          pinnedId: '',
+          launching: false,
+        });
+        item.dataset.hwnd = String(win.hwnd);
+        item.style.setProperty('--i', String(index++));
+        item.classList.add('enter');
+        appsList.appendChild(item);
+      });
+
+      pinnedOnly.forEach(app => {
+        const name = app.name || 'Приложение';
+        const item = makeAppItem({
+          label: name,
+          windowTitle: '',
+          iconId: app.icon_id,
+          running: false,
+          active: false,
+          hwnd: 0,
+          pinnedId: app.id,
+          launching: pendingLaunchId === app.id,
+        });
+        item.style.setProperty('--i', String(index++));
+        item.classList.add('enter');
+        appsList.appendChild(item);
+      });
+
+      setActiveApp(activeHwnd);
+    }
+
+    function onLaunchResult(data) {
+      if (!data) return;
+      clearTimeout(pendingLaunchTimer);
+      if (data.ok) {
+        showHUD('Запуск: ' + (data.name || 'приложение'));
+        pendingLaunchId = '';
+        // Give Windows a moment to create the window, then refresh the dock.
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 700);
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 1900);
+      } else {
+        pendingLaunchId = '';
+        showHUD('Не удалось запустить');
+        setTimeout(() => { if (wsConnected) send({ type: 'get_windows' }); }, 600);
+      }
+    }
+
+    // --- Music island ------------------------------------------------------
+    // Windows exposes every player through SMTC; the server reads the current
+    // track and forwards transport commands, so the island controls whatever
+    // is playing without extra plugins.
+    const island = document.getElementById('island');
+    const islandPill = document.getElementById('island-pill');
+    const islandArt = document.getElementById('island-art');
+    const islandCompactTitle = document.getElementById('island-title-compact');
+    const islandCard = document.getElementById('island-card');
+    const islandCover = document.getElementById('island-cover');
+    const islandApp = document.getElementById('island-app');
+    const islandName = document.getElementById('island-name');
+    const islandArtist = document.getElementById('island-artist');
+    const islandPos = document.getElementById('island-pos');
+    const islandDur = document.getElementById('island-dur');
+    const islandFill = document.getElementById('island-progress-fill');
+    const islandCollapse = document.getElementById('island-collapse');
+    const islandPrev = document.getElementById('island-prev');
+    const islandPlay = document.getElementById('island-play');
+    const islandNext = document.getElementById('island-next');
+    const islandPlayIcon = document.getElementById('island-play-icon');
+    const islandPauseIcon = document.getElementById('island-pause-icon');
+
+    // Some players drop their media session for a moment between tracks, while
+    // buffering or when switching devices. The island waits this long before it
+    // actually disappears, and re-checks the player once more inside that window
+    // (the normal poll interval is 3 s, so a 1 s gap could otherwise be missed).
+    const ISLAND_GRACE_MS = 2400;
+    const ISLAND_RECHECK_MS = 900;
+
+    let mediaState = null;
+    let mediaPlayhead = 0;   // seconds at mediaStamp
+    let mediaDuration = 0;
+    let mediaPlaying = false;
+    let mediaStamp = 0;      // performance.now() when the state arrived
+    let mediaPollTimer = null;
+    let islandHideTimer = null;
+    let islandRecheckTimer = null;
+    let islandBumpTimer = null;
+    let lastTrackKey = '';
+
+    function formatTime(seconds) {
+      const total = Math.max(0, Math.floor(seconds || 0));
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+
+    function currentPlayhead() {
+      let pos = mediaPlayhead;
+      if (mediaPlaying) pos += (performance.now() - mediaStamp) / 1000;
+      return Math.min(pos, mediaDuration || pos);
+    }
+
+    function paintProgress() {
+      if (!mediaDuration) {
+        islandFill.style.width = '0%';
+        islandPos.textContent = '0:00';
+        islandDur.textContent = '0:00';
+        return;
+      }
+      const pos = Math.min(currentPlayhead(), mediaDuration);
+      islandPos.textContent = formatTime(pos);
+      islandDur.textContent = formatTime(mediaDuration);
+      islandFill.style.width = (pos / mediaDuration * 100).toFixed(2) + '%';
+    }
+
+    function paintPlayState() {
+      island.classList.toggle('paused', !mediaPlaying);
+      islandPlayIcon.style.display = mediaPlaying ? 'none' : '';
+      islandPauseIcon.style.display = mediaPlaying ? '' : 'none';
+      islandPill.setAttribute('aria-label',
+        mediaPlaying ? 'Музыка играет — открыть плеер' : 'Пауза — открыть плеер');
+    }
+
+    function isIslandVisible() {
+      return island.classList.contains('visible');
+    }
+
+    function showIsland() {
+      if (islandHideTimer) {
+        clearTimeout(islandHideTimer);
+        islandHideTimer = null;
+      }
+      if (islandRecheckTimer) {
+        clearTimeout(islandRecheckTimer);
+        islandRecheckTimer = null;
+      }
+      if (!isIslandVisible()) {
+        island.classList.remove('hiding');
+        island.classList.add('visible');
+        island.setAttribute('aria-hidden', 'false');
+        lastTrackKey = '';
+      }
+    }
+
+    function hideIsland() {
+      if (!isIslandVisible()) return;
+      if (islandRecheckTimer) {
+        clearTimeout(islandRecheckTimer);
+        islandRecheckTimer = null;
+      }
+      setCardOpen(false);
+      island.classList.remove('visible');
+      island.classList.add('hiding');
+      island.setAttribute('aria-hidden', 'true');
+      setTimeout(() => {
+        island.classList.remove('hiding', 'paused', 'bump');
+      }, 420);
+    }
+
+    // A subtle "breathe" whenever the track changes, like the real island.
+    function bumpIsland() {
+      island.classList.remove('bump');
+      void island.offsetWidth;
+      island.classList.add('bump');
+      clearTimeout(islandBumpTimer);
+      islandBumpTimer = setTimeout(() => island.classList.remove('bump'), 520);
+    }
+
+    function paintTrack(state) {
+      mediaPlaying = !!state.playing;
+      mediaDuration = state.duration || 0;
+      mediaPlayhead = state.position || 0;
+      mediaStamp = performance.now();
+
+      // Album art is served by id and cached for a year, so a track change
+      // costs one small request.
+      const cover = state.art ? 'url("/api/art/' + state.art + '")' : '';
+      islandArt.style.backgroundImage = cover;
+      islandCover.style.backgroundImage = cover;
+      islandCover.textContent = state.art ? '' : '♪';
+
+      islandCompactTitle.textContent = state.title || 'Без названия';
+      islandName.textContent = state.title || 'Без названия';
+      islandArtist.textContent = state.artist || state.album || '';
+      islandApp.textContent = state.app || 'Плеер';
+
+      paintPlayState();
+      islandPrev.disabled = state.can_previous === false;
+      islandNext.disabled = state.can_next === false;
+      paintProgress();
+
+      const trackKey = [state.app, state.title, state.artist, state.album, state.art].join('|');
+      if (lastTrackKey && trackKey !== lastTrackKey) bumpIsland();
+      lastTrackKey = trackKey;
+    }
+
+    function applyMediaState(state) {
+      const has = !!(state && state.has_session);
+
+      if (has) {
+        mediaState = state;
+        showIsland();
+        paintTrack(state);
+        return;
+      }
+
+      // A momentary gap is not the end of the track: keep the island on screen
+      // and only retract it once the session stays gone for the grace period.
+      mediaState = state || null;
+      if (!isIslandVisible()) {
+        return;
+      }
+      if (islandHideTimer) return;
+      islandHideTimer = setTimeout(() => {
+        islandHideTimer = null;
+        if (mediaState && mediaState.has_session) return;
+        mediaPlaying = false;
+        island.classList.remove('bump');
+        hideIsland();
+      }, ISLAND_GRACE_MS);
+      if (!islandRecheckTimer) {
+        islandRecheckTimer = setTimeout(recheckMediaDuringGrace, ISLAND_RECHECK_MS);
+      }
+    }
+
+    // While the island is waiting out a gap, keep asking the player instead of
+    // trusting one poll: a short session drop is then caught and the island
+    // never even starts to hide.
+    function recheckMediaDuringGrace() {
+      islandRecheckTimer = null;
+      if (!islandHideTimer) return;
+      requestMediaState();
+      islandRecheckTimer = setTimeout(recheckMediaDuringGrace, ISLAND_RECHECK_MS);
+    }
+
+    function requestMediaState() {
+      if (!wsConnected) return;
+      send({ type: 'media_state' });
+    }
+
+    // Poll faster while a track is on screen, slower when nothing is playing
+    // (but often enough that starting music brings the island back quickly).
+    function scheduleMediaPoll() {
+      clearTimeout(mediaPollTimer);
+      const active = isIslandVisible();
+      mediaPollTimer = setTimeout(() => {
+        if (!document.hidden && !gestureActive) requestMediaState();
+        scheduleMediaPoll();
+      }, active ? 2500 : 4000);
+    }
+
+    function mediaCommand(action) {
+      if (!wsConnected) return;
+      haptic.ui();
+      send({ type: 'media_control', action: action });
+
+      // Optimistic feedback: the button reacts before the server answers, and
+      // the reply replaces this with the real state.
+      if (action === 'play_pause') {
+        mediaPlayhead = currentPlayhead();
+        mediaPlaying = !mediaPlaying;
+        mediaStamp = performance.now();
+        paintPlayState();
+      }
+      setTimeout(requestMediaState, 400);
+    }
+
+    // --- Island expand / collapse (tap, outside tap, swipe down) -----------
+    function setCardOpen(open) {
+      const next = !!open && isIslandVisible();
+      islandCard.classList.toggle('open', next);
+      island.classList.toggle('island-expanded', next);
+      islandCard.setAttribute('aria-hidden', next ? 'false' : 'true');
+      if (next) {
+        islandCard.classList.remove('dragging');
+        islandCard.style.transform = '';
+        requestMediaState();
+      }
+    }
+
+    islandPill.addEventListener('click', () => {
+      if (!isIslandVisible()) return;
+      haptic.ui();
+      setCardOpen(!islandCard.classList.contains('open'));
+    });
+
+    islandCollapse.addEventListener('click', () => {
+      haptic.ui();
+      setCardOpen(false);
+    });
+
+    islandPrev.addEventListener('click', () => mediaCommand('previous'));
+    islandPlay.addEventListener('click', () => mediaCommand('play_pause'));
+    islandNext.addEventListener('click', () => mediaCommand('next'));
+
+    // Tapping anywhere outside the card collapses it again.
+    document.addEventListener('pointerdown', (event) => {
+      if (!islandCard.classList.contains('open')) return;
+      if (islandCard.contains(event.target) || islandPill.contains(event.target)) return;
+      setCardOpen(false);
+    }, true);
+
+    // Drag the card down to dismiss it, exactly like an iOS sheet.
+    let cardDrag = null;
+
+    islandCard.addEventListener('pointerdown', (event) => {
+      if (!islandCard.classList.contains('open')) return;
+      if (event.target.closest('button')) return;
+      cardDrag = {
+        id: event.pointerId,
+        startY: event.clientY,
+        startTime: performance.now(),
+        moved: false,
+      };
+      islandCard.classList.add('dragging');
+      try { islandCard.setPointerCapture(event.pointerId); } catch (e) {}
+    });
+
+    islandCard.addEventListener('pointermove', (event) => {
+      if (!cardDrag || event.pointerId !== cardDrag.id) return;
+      const dy = Math.max(0, event.clientY - cardDrag.startY);
+      if (dy > 6) cardDrag.moved = true;
+      const damped = dy < 90 ? dy : 90 + (dy - 90) * 0.32;
+      islandCard.style.transform =
+        'translateX(-50%) translateY(' + damped.toFixed(1) + 'px) scale(' +
+        (1 - Math.min(damped / 1600, 0.05)).toFixed(3) + ')';
+    });
+
+    function endCardDrag(event) {
+      if (!cardDrag) return;
+      const dy = Math.max(0, event.clientY - cardDrag.startY);
+      const elapsed = Math.max(1, performance.now() - cardDrag.startTime);
+      const velocity = dy / elapsed;
+      cardDrag = null;
+      islandCard.classList.remove('dragging');
+      islandCard.style.transform = '';
+      if (dy > 70 || velocity > 0.55) setCardOpen(false);
+    }
+
+    islandCard.addEventListener('pointerup', endCardDrag);
+    islandCard.addEventListener('pointercancel', endCardDrag);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) requestMediaState();
+    });
+
+    // Repaint the progress bar on the same cadence as its CSS transition, so
+    // the fill glides instead of stepping.
+    setInterval(() => {
+      if (isIslandVisible()) paintProgress();
+    }, 500);
+    scheduleMediaPoll();
+  </script>
+</body>
+</html>

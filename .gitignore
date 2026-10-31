@@ -1,0 +1,22 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated at runtime by the trackpad server
+qr.png
+*.log
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# This launcher lives outside the WebTrackpad project folder and is not part
+# of the repository (only WebTrackpad/ is published for now).
+/Запустить Трекпад.bat
