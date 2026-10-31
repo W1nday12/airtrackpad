@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
     setup_env.ps1 — подготовка локального окружения AirTrackpad (Windows).
 
