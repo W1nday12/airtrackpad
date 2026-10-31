@@ -70,6 +70,26 @@ while ($true) {
                 $message = 'auto: ' + $summary
                 if ($message.Length -gt 180) { $message = $message.Substring(0, 177) + '...' }
                 Invoke-Git @('add', '-A') | Out-Null
+
+                # Safety net: GitHub rejects files above 100 MB and the push
+                # would then retry forever. Keep huge artifacts out of the
+                # commit and leave them on disk instead.
+                $bigPaths = @()
+                foreach ($raw in $status) {
+                    if ($raw.Length -lt 4) { continue }
+                    $path = $raw.Substring(3).Trim()
+                    if ($path -match '^"(.*)"$') { $path = $Matches[1] -replace '\\(.)', '$1' }
+                    if (-not $path) { continue }
+                    $full = Join-Path $Repo $path
+                    if ((Test-Path -LiteralPath $full -PathType Leaf) -and ((Get-Item -LiteralPath $full).Length -gt 45MB)) {
+                        $bigPaths += $path
+                    }
+                }
+                if ($bigPaths.Count -gt 0) {
+                    Invoke-Git (@('reset', '-q', '--') + $bigPaths) | Out-Null
+                    Write-Log ("skipped large files (>45 MB): " + ($bigPaths -join ', '))
+                }
+
                 $commit = Invoke-Git @('commit', '-m', $message)
                 if ($commit.Code -eq 0) {
                     Write-Log "committed: $message"
