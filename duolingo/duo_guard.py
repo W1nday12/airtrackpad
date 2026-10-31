@@ -308,16 +308,18 @@ def main() -> int:
         return 0
 
     # Pick a story for the user's course.
-    slugs = list_stories(token, from_lang, learn_lang)
-    slug = (cfg.get("story_slug") or "").strip()
-    if slug:
-        candidates = [slug] + [s for s in slugs if s != slug]
+    stories = list_stories(token, from_lang, learn_lang)
+    forced = (cfg.get("story_slug") or "").strip()
+    if forced:
+        candidates = [forced] + [s["id"] for s in stories if s["id"] != forced]
     else:
-        candidates = slugs
+        candidates = [s["id"] for s in stories]
     if not candidates:
         log("Не удалось получить список историй для курса {0}→{1}.".format(from_lang, learn_lang))
         notify("Duolingo: стрик под угрозой", "Бот не смог найти историю. Сделай урок вручную!")
         return 4
+    log("Найдено историй: {0}, первая: «{1}» ({2} XP).".format(
+        len(stories), stories[0]["title"], stories[0]["xp"]))
 
     for candidate in candidates[:5]:
         status, data = complete_story(token, candidate, from_lang, learn_lang)
