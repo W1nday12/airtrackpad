@@ -164,27 +164,47 @@ def extended_today(user: dict) -> bool:
 
 
 def list_stories(token: str, from_lang: str, learn_lang: str) -> list:
-    """Return story slugs available for the course (API shape may change)."""
+    """Return story ids available for the course (API shape may change).
+
+    The stories service answers with {"sets": [[{story}, {story}, ...], ...]};
+    each story has an "id" (used in the /complete URL), a title and xpToAward.
+    """
     for url in (
         "{0}?fromLanguage={1}&learningLanguage={2}".format(STORIES, from_lang, learn_lang),
         "{0}?learningLanguage={1}&fromLanguage={2}".format(STORIES, learn_lang, from_lang),
-        STORIES,
     ):
         status, data = http_json("GET", url, token)
-        if status != 200:
+        if status != 200 or not isinstance(data, dict):
             continue
-        if isinstance(data, list):
-            items = data
-        elif isinstance(data, dict):
+
+        items = []
+        for group in data.get("sets") or []:
+            if isinstance(group, list):
+                items.extend(group)
+            elif isinstance(group, dict):
+                items.append(group)
+        if not items:
             items = data.get("stories") or data.get("data") or []
-        else:
-            items = []
-        slugs = []
+
+        stories = []
         for item in items:
-            if isinstance(item, dict) and item.get("slug"):
-                slugs.append(item["slug"])
-        if slugs:
-            return slugs
+            if not isinstance(item, dict):
+                continue
+            if item.get("isVideo"):
+                continue
+            if (item.get("state") or "ACTIVE") != "ACTIVE":
+                continue
+            story_id = item.get("id") or item.get("slug")
+            if story_id:
+                stories.append({
+                    "id": story_id,
+                    "title": item.get("title") or "",
+                    "xp": item.get("xpToAward") or 0,
+                })
+        if stories:
+            # Cheapest stories first: enough for the streak, less suspicious.
+            stories.sort(key=lambda s: (s["xp"] or 999, s["id"]))
+            return stories
     return []
 
 
@@ -253,6 +273,7 @@ def main() -> int:
     group.add_argument("--check", action="store_true", help="только проверить, ничего не делать")
     group.add_argument("--run", action="store_true", help="проверить и при необходимости завершить историю")
     group.add_argument("--debug", action="store_true", help="показать сырые данные о стрике")
+    group.add_argument("--force-story", action="store_true", help="завершить историю даже если стрик уже продлён (проверка)")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -274,6 +295,9 @@ def main() -> int:
         return 0
 
     done = extended_today(user)
+    if args.force_story:
+        done = False
+        log("Режим проверки: завершаю историю, даже если стрик уже продлён.")
     log(("Стрик уже продлён сегодня." if done else "Стрик сегодня ещё НЕ продлён.") + " " + describe(user))
 
     if args.check:
