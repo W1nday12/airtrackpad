@@ -11,6 +11,9 @@ env/
 # Generated at runtime by the trackpad server
 qr.png
 *.log
+logs/
+*.stop
+.pid
 
 # OS junk
 Thumbs.db
