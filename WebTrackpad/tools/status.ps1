@@ -36,6 +36,19 @@ function Get-ServerListener {
         Select-Object -First 1
 }
 
+# Python helpers must run from the project folder: -c puts the current
+# directory on sys.path, and network_info lives next to server.py.
+function Invoke-Python {
+    param([string]$Code, [string]$Arg = '')
+    if (-not $py) { return $null }
+    Push-Location -LiteralPath $AppDir
+    try {
+        if ($Arg) { & $py -c $Code $Arg 2>$null } else { & $py -c $Code 2>$null }
+    } finally {
+        Pop-Location
+    }
+}
+
 Write-Host ''
 Write-Host '  ===== AirTrackpad: статус =====' -ForegroundColor Cyan
 Write-Host ('  Папка: ' + $AppDir)
@@ -50,7 +63,7 @@ if ($listener) {
     Write-Host ('  Сервер:  РАБОТАЕТ  (порт ' + $listener.LocalPort + ', pid ' + $listener.OwningProcess + ', ' + $procName + ')') -ForegroundColor Green
 
     if ($py) {
-        $json = & $py -c 'import json,sys,network_info;print(json.dumps(network_info.get_url_options(int(sys.argv[1])),ensure_ascii=False))' $listener.LocalPort 2>$null
+        $json = Invoke-Python -Code 'import json,sys,network_info;print(json.dumps(network_info.get_url_options(int(sys.argv[1])),ensure_ascii=False))' -Arg ([string]$listener.LocalPort)
         $urls = $null
         try { $urls = $json | ConvertFrom-Json } catch { }
         if ($urls) {
@@ -63,7 +76,8 @@ if ($listener) {
         }
         if ($Qr) {
             Write-Host '  QR-код (наведите камеру телефона):'
-            & $py -c 'import sys,qrcode;q=qrcode.QRCode(border=1);q.add_data(sys.argv[1]);q.print_ascii(invert=True)' $best
+            Invoke-Python -Code 'import sys,qrcode;q=qrcode.QRCode(border=1);q.add_data(sys.argv[1]);q.print_ascii(invert=True)' -Arg $best |
+                ForEach-Object { Write-Host $_ }
         }
     }
 } else {
