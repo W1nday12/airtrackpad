@@ -104,26 +104,31 @@ try {
     $projectPrefix = $projectFull + '\'
 
     # ------------------------------------------------------------------ file list
-    $excludedDirNames = @('.venv', 'venv', '.git', '__pycache__', 'logs', '.mypy_cache', '.pytest_cache', '.ruff_cache', 'node_modules')
+    $excludedDirPatterns = @('^\.venv', '^venv', '^__pycache__$', '^\.git$', '^logs$', '^\.mypy_cache$', '^\.pytest_cache$', '^\.ruff_cache$', '^node_modules$', '^\.idea$', '^\.vscode$')
     $excludedFileNames = @('qr.png', 'thumbs.db', 'desktop.ini', '.ds_store')
     $excludedFilePatterns = @('*.pyc', '*.pyo', '*.log', '*.tmp', '*.swp')
 
     $allFiles = @(Get-ChildItem -LiteralPath $projectFull -Recurse -File -Force -ErrorAction SilentlyContinue)
     $files = New-Object System.Collections.Generic.List[object]
+    $excludedCount = 0
     foreach ($f in $allFiles) {
         $rel = $f.FullName.Substring($projectPrefix.Length)
         $parts = $rel.Split('\')
         $skip = $false
         foreach ($part in $parts) {
-            if ($excludedDirNames -contains $part.ToLowerInvariant()) { $skip = $true; break }
+            $lowerPart = $part.ToLowerInvariant()
+            foreach ($dirPattern in $excludedDirPatterns) {
+                if ($lowerPart -match $dirPattern) { $skip = $true; break }
+            }
+            if ($skip) { break }
         }
-        if ($skip) { continue }
+        if ($skip) { $excludedCount++; continue }
         $leaf = $parts[$parts.Length - 1].ToLowerInvariant()
-        if ($excludedFileNames -contains $leaf) { continue }
+        if ($excludedFileNames -contains $leaf) { $excludedCount++; continue }
         foreach ($pattern in $excludedFilePatterns) {
             if ($leaf -like $pattern) { $skip = $true; break }
         }
-        if ($skip) { continue }
+        if ($skip) { $excludedCount++; continue }
         $files.Add($f)
     }
 
@@ -133,7 +138,7 @@ try {
 
     $totalBytes = 0
     foreach ($f in $files) { $totalBytes += [long]$f.Length }
-    Write-Log ('selected {0} file(s), {1}' -f $files.Count, (Format-Bytes $totalBytes))
+    Write-Log ('selected {0} file(s), {1} (excluded {2} file(s) by rules)' -f $files.Count, (Format-Bytes $totalBytes), $excludedCount)
 
     # ------------------------------------------------------------------ staging copy
     $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ('WebTrackpad-backup-' + [guid]::NewGuid().ToString('N'))
@@ -143,7 +148,8 @@ try {
     foreach ($f in $files) {
         $rel = $f.FullName.Substring($projectPrefix.Length)
         $dest = Join-Path $stagingDir $rel
-        $parent = Split-Path -LiteralPath $dest -Parent
+        # note: PS 5.1 Split-Path -LiteralPath does not support -Parent, so use .NET
+        $parent = [System.IO.Path]::GetDirectoryName($dest)
         if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
             New-Item -ItemType Directory -Path $parent -Force | Out-Null
         }
@@ -240,7 +246,13 @@ try {
     Write-Log ('backup OK: {0} | files={1} source={2} | errors={3}' -f $zipPath, $files.Count, (Format-Bytes $totalBytes), $script:errors)
 } catch {
     $script:errors++
-    Write-Log ('backup FAILED: {0}' -f $_.Exception.Message) 'ERROR'
+    $where = ''
+    if ($_.InvocationInfo) {
+        $where = ' at line {0}' -f $_.InvocationInfo.ScriptLineNumber
+        if ($_.InvocationInfo.Line) { $where += (': ' + $_.InvocationInfo.Line.Trim()) }
+    }
+    Write-Log ('backup FAILED{0}: {1}' -f $where, $_.Exception.Message) 'ERROR'
+    if ($_.ScriptStackTrace) { Write-Log ('stack: {0}' -f ($_.ScriptStackTrace -replace "`r?`n", ' | ')) 'ERROR' }
 } finally {
     if ($stagingDir -and (Test-Path -LiteralPath $stagingDir)) {
         try {
