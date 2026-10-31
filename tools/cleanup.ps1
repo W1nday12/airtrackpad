@@ -100,10 +100,15 @@ if ($DocMinAgeDays -lt 0) { $DocMinAgeDays = $MinAgeDays }
 
 # protected paths: the project folder is always off limits
 $protected = New-Object System.Collections.Generic.List[string]
-$protected.Add('D:\Download\project')
-$protected.Add((Join-Path $rootFull 'project'))
-foreach ($p in $ExtraProtectedPaths) {
-    if ($p) { $protected.Add($p) }
+$protectedCandidates = @('D:\Download\project', (Join-Path $rootFull 'project')) + @($ExtraProtectedPaths)
+foreach ($p in $protectedCandidates) {
+    if (-not $p) { continue }
+    $norm = $p.TrimEnd('\')
+    $isDup = $false
+    foreach ($existing in $protected) {
+        if ([string]::Equals($existing, $norm, [System.StringComparison]::OrdinalIgnoreCase)) { $isDup = $true; break }
+    }
+    if (-not $isDup) { $protected.Add($norm) }
 }
 
 if (-not (Test-Path -LiteralPath $LogDir -PathType Container)) {
@@ -341,7 +346,6 @@ if ($Apply) {
 
 # --------------------------------------------------------------------------- summary
 $sum = @(
-    '',
     ('SUMMARY ({0})' -f $mode),
     ('  Recycle-bin candidates : {0} file(s), {1}' -f $deleteCandidates.Count, (Format-Bytes $bytesToDelete)),
     ('  Documents to archive   : {0} file(s), {1}  -> {2}' -f $docCandidates.Count, (Format-Bytes $bytesToArchive), $ArchiveDir),
