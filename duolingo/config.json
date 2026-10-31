@@ -1,0 +1,8 @@
+{
+  "jwt_token": "",
+  "user_id": "",
+  "from_language": "",
+  "learning_language": "",
+  "story_slug": "",
+  "_help": "jwt_token — строка из cookie jwt_token на duolingo.com (см. README.md). user_id/языки можно оставить пустыми: подтянутся автоматически. story_slug — необязательно, если нужно зафиксировать конкретную историю."
+}
