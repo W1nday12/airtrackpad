@@ -55,7 +55,7 @@ $script:errors = 0
 
 if (-not $ToolsDir) { $ToolsDir = 'D:\Download\project\tools' }
 $ToolsDir = (Get-Item -LiteralPath $ToolsDir -Force).FullName.TrimEnd('\')
-if (-not $LogDir) { $LogDir = Join-Path (Split-Path -LiteralPath $ToolsDir -Parent) 'logs' }
+if (-not $LogDir) { $LogDir = Join-Path ([System.IO.Path]::GetDirectoryName($ToolsDir)) 'logs' }
 if (-not (Test-Path -LiteralPath $LogDir -PathType Container)) {
     try { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null } catch { }
 }
