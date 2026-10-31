@@ -61,7 +61,7 @@ def log(message: str, quiet: bool = False) -> None:
             fh.write(line + "\n")
     except OSError:
         pass
-    if not quiet:
+    if not quiet and sys.stdout is not None:
         print(line, flush=True)
 
 
