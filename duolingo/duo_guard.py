@@ -152,15 +152,35 @@ def current_streak(user: dict) -> dict:
     return ((user.get("streakData") or {}).get("currentStreak") or {})
 
 
+def day_candidates() -> set:
+    """Duolingo's streak day can roll a few hours before/after local midnight
+    (the observed account day was already tomorrow at 23:02 Moscow time), so
+    accept both today's and tomorrow's local date as "current"."""
+    now = datetime.now()
+    return {
+        now.strftime("%Y-%m-%d"),
+        (now + timedelta(days=1)).strftime("%Y-%m-%d"),
+    }
+
+
 def extended_today(user: dict) -> bool:
-    """Best-effort: has the streak already been extended today?"""
+    """Best-effort: has the streak already been extended for the current day?"""
     streak = current_streak(user)
-    today = today_str()
+    if not streak:
+        return False
+    candidates = day_candidates()
     for key in ("lastExtendedDate", "lastExtendedDateString", "endDate"):
         value = streak.get(key)
-        if value and str(value)[:10] == today:
+        if value and str(value)[:10] in candidates:
             return True
     return False
+
+
+def streak_len(user: dict) -> int:
+    try:
+        return int(current_streak(user).get("length") or user.get("streak") or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def list_stories(token: str, from_lang: str, learn_lang: str) -> list:
@@ -337,9 +357,11 @@ def main() -> int:
     # Verify that the streak really moved.
     time.sleep(3)
     user_after = get_user(token, user_id)
-    if extended_today(user_after):
-        log("Проверка после: стрик продлён. ok.")
-        save_json(STATE_PATH, {"date": today_str(), "streak": user_after.get("streak"), "action": "story"})
+    grew = streak_len(user_after) > streak_len(user)
+    if extended_today(user_after) or grew:
+        log("Проверка после: стрик продлён ({0} → {1}). ok.".format(
+            streak_len(user), streak_len(user_after)))
+        save_json(STATE_PATH, {"date": today_str(), "streak": streak_len(user_after), "action": "story"})
         return 0
 
     log("Проверка после: стрик всё ещё не продлён — нужен ручной урок.")
