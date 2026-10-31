@@ -1,4 +1,4 @@
-# AirTrackpad supervisor.
+﻿# AirTrackpad supervisor.
 # Runs server.py and restarts it if it crashes or exits unexpectedly.
 # Manual use:  powershell -NoProfile -ExecutionPolicy Bypass -File tools\supervise.ps1
 # Autostart use: tools\run_hidden.vbs (task "AirTrackpad Autostart") passes -Hidden.

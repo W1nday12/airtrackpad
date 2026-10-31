@@ -1,4 +1,4 @@
-# Stops the AirTrackpad server and its supervisor (manual start or autostart).
+﻿# Stops the AirTrackpad server and its supervisor (manual start or autostart).
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\stop.ps1
 
 [CmdletBinding()]

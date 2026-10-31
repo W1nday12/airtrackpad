@@ -1,4 +1,4 @@
-# Removes the AirTrackpad logon task created by install_autostart.ps1.
+﻿# Removes the AirTrackpad logon task created by install_autostart.ps1.
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\uninstall_autostart.ps1
 
 [CmdletBinding()]

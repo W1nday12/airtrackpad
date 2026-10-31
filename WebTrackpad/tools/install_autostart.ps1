@@ -1,4 +1,4 @@
-# Installs (or removes with -Remove) the logon task that starts AirTrackpad hidden.
+﻿# Installs (or removes with -Remove) the logon task that starts AirTrackpad hidden.
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_autostart.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_autostart.ps1 -Remove

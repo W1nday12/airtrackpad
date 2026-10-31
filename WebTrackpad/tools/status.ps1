@@ -1,4 +1,4 @@
-# AirTrackpad status: is the server running, on which port, which URLs to open,
+﻿# AirTrackpad status: is the server running, on which port, which URLs to open,
 # firewall state, autostart state and the tail of the log.
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tools\status.ps1
