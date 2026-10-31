@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
     setup_env.ps1 — подготовка локального окружения AirTrackpad (Windows).
 
@@ -6,7 +6,9 @@
       1. Создаёт .venv в корне проекта (python -m venv).
       2. Обновляет pip внутри .venv.
       3. Ставит зависимости из requirements.txt.
-      4. Проверяет импорт websockets / qrcode / PIL и печатает путь к python.exe.
+      4. Ставит зависимости музыкального «острова» (winrt) из
+         requirements-media.txt — без них капсула «Now Playing» не появляется.
+      5. Проверяет импорт websockets / qrcode / PIL / winrt и печатает путь к python.exe.
 
     Идемпотентность:
       Если .venv уже есть и импорты проходят, скрипт сразу завершается с кодом 0.
@@ -34,6 +36,7 @@ $ProjectDir = Split-Path -Parent $PSScriptRoot
 $VenvDir    = Join-Path $ProjectDir '.venv'
 $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
 $ReqFile    = Join-Path $ProjectDir 'requirements.txt'
+$MediaReqFile = Join-Path $ProjectDir 'requirements-media.txt'
 
 $script:BasePythonExe  = $null
 $script:BasePythonArgs = @()
