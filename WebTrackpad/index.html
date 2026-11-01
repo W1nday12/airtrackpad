@@ -1028,7 +1028,7 @@
         inset 0 0 0 1px rgba(255, 255, 255, 0.08),
         0 4px 14px rgba(0, 0, 0, 0.45);
       cursor: pointer;
-      pointer-events: auto;
+      pointer-events: none;
       opacity: 0;
       transform: translateY(-3px) scale(0.62);
       transform-origin: center;
@@ -1041,6 +1041,7 @@
 
     #island.visible #island-pill {
       opacity: 1;
+      pointer-events: auto;
       transform: translateY(0) scale(1);
     }
 
@@ -1096,6 +1097,12 @@
       background-position: center;
       background-size: cover;
       background-repeat: no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      line-height: 1;
     }
 
     .island-title-compact {
@@ -1359,6 +1366,16 @@
       :root {
         --island-band: 34px;
         --header-h: 44px;
+      }
+
+      /* Pixel 9 (and most modern Androids) put the camera punch-hole on the
+         left edge in landscape. Chrome reports it through env(), but not in
+         every build / display mode, so touch devices always keep a real
+         gutter: the dock must never end up underneath the lens. */
+      @media (pointer: coarse) {
+        :root {
+          --safe-left: max(env(safe-area-inset-left, 0px), 34px);
+        }
       }
 
       #app {
