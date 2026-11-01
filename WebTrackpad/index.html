@@ -3901,6 +3901,7 @@
       // costs one small request.
       const cover = state.art ? 'url("/api/art/' + state.art + '")' : '';
       islandArt.style.backgroundImage = cover;
+      islandArt.textContent = state.art ? '' : '♪';
       islandCover.style.backgroundImage = cover;
       islandCover.textContent = state.art ? '' : '♪';
 
